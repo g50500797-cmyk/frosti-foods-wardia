@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: wardia-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PGSSL
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
