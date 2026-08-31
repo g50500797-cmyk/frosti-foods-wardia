@@ -11,7 +11,12 @@ const { Pool } = require('pg');
 const app = express();
 const port = Number(process.env.PORT || 5521);
 const jwtSecret = process.env.JWT_SECRET || 'local-development-only';
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  connectionTimeoutMillis: 10000,
+});
+pool.on('error', (error) => console.error('Postgres pool error (idle client):', error.message));
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
@@ -457,7 +462,7 @@ app.get('/api/shifts/:id/notifications', auth, async (req, res, next) => { try {
 app.patch('/api/notifications/:id/read', auth, async (req, res, next) => { try { await pool.query('UPDATE notifications SET is_read=TRUE WHERE id=$1', [req.params.id]); res.json({ ok: true }); } catch (error) { next(error); } });
 app.use((error, _req, res, _next) => { console.error(error); res.status(500).json({ error: 'INTERNAL_SERVER_ERROR' }); });
 
-async function start() {
+async function ensureSchemaAndSeed() {
   const schema = fs.readFileSync(path.resolve(__dirname, '..', 'schema.postgres.full.sql'), 'utf8');
   await pool.query(schema);
   await pool.query(`INSERT INTO roles(code,name) VALUES ('SYSTEM_ADMIN','System Admin'),('SHIFT_MANAGER','Shift Manager'),('SECURITY','Security'),('QUALITY','Quality'),('QUALITY_ENGINEER','Quality Engineer'),('PRODUCTION','Production'),('PRODUCTION_ENGINEER','Production Engineer'),('MAINTENANCE','Maintenance'),('WAREHOUSE','Warehouse') ON CONFLICT(code) DO NOTHING`);
@@ -471,6 +476,20 @@ async function start() {
   ];
   for (const [name, email, plainPassword, role, department] of demoUsers) await pool.query('INSERT INTO users(name,email,password_hash,role_code,department) VALUES($1,$2,$3,$4,$5) ON CONFLICT(email) DO NOTHING', [name, email, bcrypt.hashSync(plainPassword, 10), role, department]);
   await pool.query(`INSERT INTO shifts(shift_no,shift_date,starts_at,ends_at,status,manager_id,opened_at) SELECT 'SHIFT-2026-08-21-02','2026-08-21','16:00','00:00','RUNNING',id,now() FROM users WHERE email='manager@wardia.app' ON CONFLICT(shift_no) DO NOTHING`);
-  app.listen(port, '0.0.0.0', () => console.log(`Wardia PostgreSQL API listening on http://0.0.0.0:${port}`));
 }
-start().catch((error) => { console.error('PostgreSQL startup failed:', error.message); process.exit(1); });
+
+// Start listening immediately so Railway's healthcheck can reach /api/health
+// as soon as the process is up, instead of waiting on schema/seed queries
+// that depend on the database being reachable (which can take longer than
+// the healthcheck timeout, or hang indefinitely if DATABASE_URL/PGSSL/network
+// are misconfigured). Schema/seed setup then runs in the background; it is
+// idempotent (IF NOT EXISTS / ON CONFLICT DO NOTHING everywhere) so it is
+// safe to retry on every boot and safe to fail without crashing the server.
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Wardia PostgreSQL API listening on http://0.0.0.0:${port}`);
+  ensureSchemaAndSeed()
+    .then(() => console.log('Schema check and seed data: OK'))
+    .catch((error) => {
+      console.error('Schema/seed setup failed (server keeps running, /api/health will report DB status):', error.message);
+    });
+});
