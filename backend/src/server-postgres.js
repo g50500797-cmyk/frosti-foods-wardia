@@ -460,6 +460,17 @@ app.post('/api/shifts/:id/maintenance', auth, roles('SYSTEM_ADMIN', 'SHIFT_MANAG
 app.post('/api/shifts/:id/inventory', auth, roles('SYSTEM_ADMIN', 'SHIFT_MANAGER', 'WAREHOUSE'), async (req, res, next) => { try { const b = req.body || {}; const quantity = Number(b.quantity); if (!b.materialName || !['RECEIPT', 'ISSUE', 'RETURN'].includes(String(b.transactionType)) || !Number.isFinite(quantity) || quantity <= 0) return res.status(400).json({ error: 'INVALID_INVENTORY' }); const row = await one('INSERT INTO inventory_transactions(shift_id,material_name,transaction_type,quantity,unit,reference_no,notes) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *', [req.params.id, b.materialName, b.transactionType, quantity, b.unit || 'kg', b.referenceNo || null, b.notes || null]); await audit(req.user.sub, 'INVENTORY', row.id, 'CREATE', row); res.status(201).json({ row }); } catch (error) { next(error); } });
 app.get('/api/shifts/:id/notifications', auth, async (req, res, next) => { try { let rows = await many('SELECT * FROM notifications WHERE shift_id = $1 ORDER BY id DESC', [req.params.id]); if (req.user.role === 'SECURITY') rows = rows.filter((item) => String(item.title).includes('حضور') || String(item.title).includes('غياب')); if (['QUALITY', 'QUALITY_ENGINEER'].includes(req.user.role)) rows = rows.filter((item) => String(item.title).includes('جودة') || String(item.title).includes('Defrost') || String(item.title).includes('ثلاجة')); res.json({ rows }); } catch (error) { next(error); } });
 app.patch('/api/notifications/:id/read', auth, async (req, res, next) => { try { await pool.query('UPDATE notifications SET is_read=TRUE WHERE id=$1', [req.params.id]); res.json({ ok: true }); } catch (error) { next(error); } });
+// Serve the built Flutter web app from backend/public, if present (see
+// `flutter build web` step in the deploy docs). API routes above always take
+// priority; this only serves the app shell for everything else.
+const publicDir = path.resolve(__dirname, '..', 'public');
+if (fs.existsSync(publicDir)) {
+  app.use(express.static(publicDir));
+  app.get(/^(?!\/api).*/, (req, res, next) => {
+    res.sendFile(path.join(publicDir, 'index.html'), (err) => { if (err) next(err); });
+  });
+}
+
 app.use((error, _req, res, _next) => { console.error(error); res.status(500).json({ error: 'INTERNAL_SERVER_ERROR' }); });
 
 async function ensureSchemaAndSeed() {
