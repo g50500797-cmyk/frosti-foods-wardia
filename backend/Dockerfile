@@ -4,6 +4,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY src ./src
 COPY schema.postgres.full.sql ./schema.postgres.full.sql
+COPY public ./public
 ENV NODE_ENV=production
 EXPOSE 5521
 CMD ["node", "src/server.js"]
