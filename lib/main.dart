@@ -289,7 +289,7 @@ class ApiClient {
           headers: const {'Content-Type': 'application/json'},
           body: jsonEncode({'email': email, 'password': password}),
         )
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) {
       throw Exception('بيانات الدخول غير صحيحة أو الخادم غير متاح');
     }
@@ -307,7 +307,7 @@ class ApiClient {
   static Future<UserSession> me(String token) async {
     final response = await http.get(_uri('/api/me'), headers: {
       'Authorization': 'Bearer $token'
-    }).timeout(const Duration(seconds: 8));
+    }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('SESSION_INVALID');
     final user = (jsonDecode(response.body) as Map<String, dynamic>)['user']
         as Map<String, dynamic>;
@@ -347,19 +347,19 @@ class ApiClient {
     final headers = {'Authorization': 'Bearer $token'};
     final currentResponse = await http
         .get(_uri('/api/shifts/current'), headers: headers)
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (currentResponse.statusCode != 200) throw Exception('SHIFT_LOAD_FAILED');
     final current = jsonDecode(currentResponse.body) as Map<String, dynamic>;
     final shift = current['shift'] as Map<String, dynamic>;
     final shiftId = shift['id'];
     final dashboardResponse = await http
         .get(_uri('/api/shifts/$shiftId/dashboard'), headers: headers)
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     final productionResponse = loadProduction
         ? await http
             .get(_uri('/api/shifts/$shiftId/production/hourly'),
                 headers: headers)
-            .timeout(const Duration(seconds: 8))
+            .timeout(const Duration(seconds: 25))
         : null;
     if (dashboardResponse.statusCode != 200 ||
         (productionResponse != null && productionResponse.statusCode != 200)) {
@@ -444,7 +444,7 @@ class ApiClient {
             'actualQty': record.actual,
           }),
         )
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) throw Exception('PRODUCTION_SAVE_FAILED');
   }
 
@@ -466,7 +466,7 @@ class ApiClient {
             'lateCount': late,
           }),
         )
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) throw Exception('ATTENDANCE_SAVE_FAILED');
   }
 
@@ -488,7 +488,7 @@ class ApiClient {
         .replace(queryParameters: query);
     final response = await http.get(uri, headers: {
       'Authorization': 'Bearer $token'
-    }).timeout(const Duration(seconds: 8));
+    }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('ATTENDANCE_LOAD_FAILED');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     final summary = (payload['summary'] as Map<String, dynamic>? ?? const {});
@@ -512,7 +512,7 @@ class ApiClient {
             queryParameters: {if (includeInactive) 'includeInactive': 'true'}),
         headers: {
           'Authorization': 'Bearer $token'
-        }).timeout(const Duration(seconds: 8));
+        }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('EMPLOYEES_LOAD_FAILED');
     return (jsonDecode(response.body)['rows'] as List<dynamic>)
         .map((row) => AttendanceEmployee.fromJson(row as Map<String, dynamic>))
@@ -550,7 +550,7 @@ class ApiClient {
             'isActive': isActive,
           }),
         )
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) {
       throw Exception(response.statusCode == 409
           ? 'EMPLOYEE_NO_EXISTS'
@@ -585,7 +585,7 @@ class ApiClient {
               'notes': notes,
               'isActive': isActive
             }))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('EMPLOYEE_UPDATE_FAILED');
     return AttendanceEmployee.fromJson((jsonDecode(response.body)
         as Map<String, dynamic>)['employee'] as Map<String, dynamic>);
@@ -619,7 +619,7 @@ class ApiClient {
             'notes': notes
           }),
         )
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201)
       throw Exception(response.statusCode == 409
           ? 'ATTENDANCE_RECORD_EXISTS'
@@ -651,7 +651,7 @@ class ApiClient {
             'notes': notes
           }),
         )
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('ATTENDANCE_UPDATE_FAILED');
     return AttendanceRecord.fromJson((jsonDecode(response.body)
         as Map<String, dynamic>)['row'] as Map<String, dynamic>);
@@ -664,7 +664,7 @@ class ApiClient {
         .replace(queryParameters: {'department': department});
     final response = await http.get(uri, headers: {
       'Authorization': 'Bearer $token'
-    }).timeout(const Duration(seconds: 8));
+    }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('PRODUCTION_LOAD_FAILED');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     return ProductionSnapshot(
@@ -684,7 +684,7 @@ class ApiClient {
               'Content-Type': 'application/json'
             },
             body: jsonEncode(entry.toJson()))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) throw Exception('PRODUCTION_CREATE_FAILED');
   }
 
@@ -694,7 +694,7 @@ class ApiClient {
     final response = await http.get(_uri('/api/shifts/$shiftId/$module'),
         headers: {
           'Authorization': 'Bearer $token'
-        }).timeout(const Duration(seconds: 8));
+        }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('MODULE_LOAD_FAILED');
     return ((jsonDecode(response.body) as Map<String, dynamic>)['rows']
                 as List<dynamic>? ??
@@ -717,7 +717,7 @@ class ApiClient {
               'quantity': quantity,
               'unit': 'kg'
             }))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) throw Exception('SUPPLY_CREATE_FAILED');
   }
 
@@ -736,7 +736,7 @@ class ApiClient {
               'reasonType': record.reason,
               'status': 'OPEN'
             }))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) throw Exception('DOWNTIME_CREATE_FAILED');
   }
 
@@ -756,7 +756,7 @@ class ApiClient {
               'description': ticket.description,
               'status': 'OPEN'
             }))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201)
       throw Exception('MAINTENANCE_CREATE_FAILED');
   }
@@ -780,7 +780,7 @@ class ApiClient {
               'quantity': movement.quantity,
               'unit': 'kg'
             }))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) throw Exception('INVENTORY_CREATE_FAILED');
   }
 
@@ -794,7 +794,7 @@ class ApiClient {
         _uri('/api/products/guides').replace(queryParameters: params),
         headers: {
           'Authorization': 'Bearer $token'
-        }).timeout(const Duration(seconds: 8));
+        }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200)
       throw Exception('PRODUCT_GUIDES_LOAD_FAILED');
     return (jsonDecode(response.body)['rows'] as List<dynamic>? ?? const [])
@@ -811,7 +811,7 @@ class ApiClient {
               'Content-Type': 'application/json'
             },
             body: jsonEncode(guide.toJson()))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201)
       throw Exception('PRODUCT_GUIDE_CREATE_FAILED');
   }
@@ -825,7 +825,7 @@ class ApiClient {
               'Content-Type': 'application/json'
             },
             body: jsonEncode(guide.toJson()))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 200)
       throw Exception('PRODUCT_GUIDE_UPDATE_FAILED');
   }
@@ -840,7 +840,7 @@ class ApiClient {
             .replace(queryParameters: params),
         headers: {
           'Authorization': 'Bearer $token'
-        }).timeout(const Duration(seconds: 8));
+        }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200)
       throw Exception('FRIDGE_READINGS_LOAD_FAILED');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -869,7 +869,7 @@ class ApiClient {
         }),
         headers: {
           'Authorization': 'Bearer $token'
-        }).timeout(const Duration(seconds: 8));
+        }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200)
       throw Exception('SHIFT_HISTORY_LOAD_FAILED');
     return ((jsonDecode(response.body) as Map<String, dynamic>)['rows']
@@ -882,7 +882,7 @@ class ApiClient {
   static Future<List<Fridge>> loadFridges(String token) async {
     final response = await http.get(_uri('/api/quality/fridges'), headers: {
       'Authorization': 'Bearer $token'
-    }).timeout(const Duration(seconds: 8));
+    }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('FRIDGES_LOAD_FAILED');
     return (jsonDecode(response.body)['rows'] as List<dynamic>? ?? const [])
         .map((row) => Fridge.fromJson(row as Map<String, dynamic>))
@@ -911,7 +911,7 @@ class ApiClient {
               'status': status,
               'notes': notes
             }))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201)
       throw Exception('FRIDGE_READING_CREATE_FAILED');
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -928,7 +928,7 @@ class ApiClient {
     final response = await http
         .get(_uri('/api/receipts').replace(queryParameters: params), headers: {
       'Authorization': 'Bearer $token'
-    }).timeout(const Duration(seconds: 8));
+    }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('RECEIPTS_LOAD_FAILED');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     return ReceiptSnapshot(
@@ -947,7 +947,7 @@ class ApiClient {
               'Content-Type': 'application/json'
             },
             body: jsonEncode(receipt.toJson()))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) throw Exception('RECEIPT_CREATE_FAILED');
   }
 
@@ -963,7 +963,7 @@ class ApiClient {
         _uri('/api/receipts/packaging').replace(queryParameters: params),
         headers: {
           'Authorization': 'Bearer $token'
-        }).timeout(const Duration(seconds: 8));
+        }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200)
       throw Exception('PACKAGING_RECEIPTS_LOAD_FAILED');
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -974,7 +974,7 @@ class ApiClient {
     final response = await http.get(
         _uri('/api/shifts/$shiftId/container-loadings'),
         headers: {'Authorization': 'Bearer $token'}).timeout(
-      const Duration(seconds: 8),
+      const Duration(seconds: 25),
     );
     if (response.statusCode != 200) {
       throw Exception('CONTAINER_LOADINGS_LOAD_FAILED');
@@ -996,7 +996,7 @@ class ApiClient {
               'Content-Type': 'application/json'
             },
             body: jsonEncode(loading.toJson()))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) {
       throw Exception('CONTAINER_LOADING_CREATE_FAILED');
     }
@@ -1013,7 +1013,7 @@ class ApiClient {
               'Content-Type': 'application/json'
             },
             body: jsonEncode(receipt.toJson()))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201)
       throw Exception('PACKAGING_RECEIPT_CREATE_FAILED');
   }
@@ -1023,7 +1023,7 @@ class ApiClient {
     final response = await http.get(_uri('/api/shifts/$shiftId/report'),
         headers: {
           'Authorization': 'Bearer $token'
-        }).timeout(const Duration(seconds: 8));
+        }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('REPORT_LOAD_FAILED');
     return jsonDecode(response.body)['report'] as Map<String, dynamic>;
   }
@@ -1034,7 +1034,7 @@ class ApiClient {
     final response = await http.get(_uri('/api/shifts/$shiftId/report.$suffix'),
         headers: {
           'Authorization': 'Bearer $token'
-        }).timeout(const Duration(seconds: 8));
+        }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('REPORT_EXPORT_FAILED');
     await downloadText(
         csv ? 'shift-report.csv' : 'shift-report.html',
@@ -1057,14 +1057,14 @@ class ApiClient {
               'closeDespiteIssues': closeDespiteIssues,
               'closeNotes': closeNotes
             }))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('SHIFT_STATUS_FAILED');
   }
 
   static Future<ShiftRecord> loadCurrentShiftRecord(String token) async {
     final response = await http.get(_uri('/api/shifts/current'), headers: {
       'Authorization': 'Bearer $token'
-    }).timeout(const Duration(seconds: 8));
+    }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('SHIFT_LOAD_FAILED');
     final row = (jsonDecode(response.body) as Map<String, dynamic>)['shift']
         as Map<String, dynamic>?;
@@ -1084,7 +1084,7 @@ class ApiClient {
     final response = await http.get(_uri('/api/shifts/$shiftId/close-review'),
         headers: {
           'Authorization': 'Bearer $token'
-        }).timeout(const Duration(seconds: 8));
+        }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('CLOSE_REVIEW_LOAD_FAILED');
     return (jsonDecode(response.body) as Map<String, dynamic>)['review']
         as Map<String, dynamic>;
@@ -1095,7 +1095,7 @@ class ApiClient {
     final response = await http.get(_uri('/api/shifts/$shiftId/problems'),
         headers: {
           'Authorization': 'Bearer $token'
-        }).timeout(const Duration(seconds: 8));
+        }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('PROBLEMS_LOAD_FAILED');
     return ((jsonDecode(response.body) as Map<String, dynamic>)['rows']
                 as List<dynamic>? ??
@@ -1108,7 +1108,7 @@ class ApiClient {
       {int shiftId = 1}) async {
     final response = await http.get(_uri('/api/shifts/$shiftId/audit-log'),
         headers: {'Authorization': 'Bearer $token'}).timeout(
-      const Duration(seconds: 8),
+      const Duration(seconds: 25),
     );
     if (response.statusCode != 200) throw Exception('AUDIT_LOAD_FAILED');
     return ((jsonDecode(response.body) as Map<String, dynamic>)['rows']
@@ -1128,7 +1128,7 @@ class ApiClient {
               'Content-Type': 'application/json'
             },
             body: jsonEncode(problem))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) throw Exception('PROBLEM_CREATE_FAILED');
     return (jsonDecode(response.body) as Map<String, dynamic>)['row']
         as Map<String, dynamic>;
@@ -1144,7 +1144,7 @@ class ApiClient {
               'Content-Type': 'application/json'
             },
             body: jsonEncode(changes))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('PROBLEM_UPDATE_FAILED');
     return (jsonDecode(response.body) as Map<String, dynamic>)['row']
         as Map<String, dynamic>;
@@ -1162,7 +1162,7 @@ class ApiClient {
               'Content-Type': 'application/json'
             },
             body: jsonEncode({}))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) {
       throw Exception('PROBLEM_CONVERT_FAILED');
     }
@@ -1185,7 +1185,7 @@ class ApiClient {
               'startsAt': startsAt,
               'endsAt': endsAt
             }))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) throw Exception('SHIFT_CREATE_FAILED');
     final row = (jsonDecode(response.body) as Map<String, dynamic>)['shift']
         as Map<String, dynamic>;
@@ -1197,7 +1197,7 @@ class ApiClient {
     final response = await http.get(_uri('/api/shifts/1/notifications'),
         headers: {
           'Authorization': 'Bearer $token'
-        }).timeout(const Duration(seconds: 8));
+        }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200)
       throw Exception('NOTIFICATIONS_LOAD_FAILED');
     return ((jsonDecode(response.body) as Map<String, dynamic>)['rows']
@@ -1210,7 +1210,7 @@ class ApiClient {
   static Future<List<Map<String, dynamic>>> roles(String token) async {
     final response = await http.get(_uri('/api/roles'), headers: {
       'Authorization': 'Bearer $token'
-    }).timeout(const Duration(seconds: 8));
+    }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('ROLES_LOAD_FAILED');
     return (jsonDecode(response.body)['rows'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
@@ -1219,7 +1219,7 @@ class ApiClient {
   static Future<List<Map<String, dynamic>>> users(String token) async {
     final response = await http.get(_uri('/api/users'), headers: {
       'Authorization': 'Bearer $token'
-    }).timeout(const Duration(seconds: 8));
+    }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('USERS_LOAD_FAILED');
     return (jsonDecode(response.body)['rows'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
@@ -1244,7 +1244,7 @@ class ApiClient {
               'roleCode': roleCode,
               'department': department
             }))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 201) throw Exception('USER_CREATE_FAILED');
   }
 
@@ -1257,7 +1257,7 @@ class ApiClient {
               'Content-Type': 'application/json'
             },
             body: jsonEncode({'isActive': active}))
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('USER_STATUS_FAILED');
   }
 }
