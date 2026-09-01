@@ -464,11 +464,16 @@ app.patch('/api/notifications/:id/read', auth, async (req, res, next) => { try {
 // `flutter build web` step in the deploy docs). API routes above always take
 // priority; this only serves the app shell for everything else.
 const publicDir = path.resolve(__dirname, '..', 'public');
-if (fs.existsSync(publicDir)) {
+const publicDirExists = fs.existsSync(publicDir);
+console.log('[static] publicDir =', publicDir, '| exists =', publicDirExists, '| __dirname =', __dirname);
+if (publicDirExists) {
+  try { console.log('[static] contents =', fs.readdirSync(publicDir)); } catch (e) { console.log('[static] readdir error', e.message); }
   app.use(express.static(publicDir));
   app.get(/^(?!\/api).*/, (req, res, next) => {
     res.sendFile(path.join(publicDir, 'index.html'), (err) => { if (err) next(err); });
   });
+} else {
+  try { console.log('[static] backend dir contents =', fs.readdirSync(path.resolve(__dirname, '..'))); } catch (e) { console.log('[static] backend readdir error', e.message); }
 }
 
 app.use((error, _req, res, _next) => { console.error(error); res.status(500).json({ error: 'INTERNAL_SERVER_ERROR' }); });
