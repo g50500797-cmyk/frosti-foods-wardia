@@ -179,7 +179,8 @@ extension UserRoleLabel on UserRole {
     if (this == UserRole.systemAdmin) return true;
     switch (this) {
       case UserRole.shiftManager:
-        return section != WorkspaceSection.users;
+        return section != WorkspaceSection.users &&
+            section != WorkspaceSection.controlPanel;
       case UserRole.security:
         return {
           WorkspaceSection.dashboard,
@@ -2235,6 +2236,7 @@ class Worker {
 
 enum WorkspaceSection {
   dashboard,
+  controlPanel,
   shift,
   attendance,
   production,
@@ -2259,6 +2261,8 @@ extension WorkspaceSectionLabel on WorkspaceSection {
     switch (this) {
       case WorkspaceSection.dashboard:
         return 'لوحة الوردية';
+      case WorkspaceSection.controlPanel:
+        return 'لوحة التحكم';
       case WorkspaceSection.shift:
         return 'الوردية الحالية';
       case WorkspaceSection.attendance:
@@ -2300,6 +2304,8 @@ extension WorkspaceSectionLabel on WorkspaceSection {
     switch (this) {
       case WorkspaceSection.dashboard:
         return Icons.dashboard_outlined;
+      case WorkspaceSection.controlPanel:
+        return Icons.admin_panel_settings_outlined;
       case WorkspaceSection.shift:
         return Icons.schedule_outlined;
       case WorkspaceSection.attendance:
@@ -2334,6 +2340,34 @@ extension WorkspaceSectionLabel on WorkspaceSection {
         return Icons.warning_amber_outlined;
       case WorkspaceSection.containerLoadings:
         return Icons.local_shipping_outlined;
+    }
+  }
+
+  Color get accentColor {
+    switch (this) {
+      case WorkspaceSection.dashboard:
+      case WorkspaceSection.shift:
+      case WorkspaceSection.attendance:
+      case WorkspaceSection.quality:
+      case WorkspaceSection.fridgeReadings:
+      case WorkspaceSection.reports:
+      case WorkspaceSection.users:
+        return AppColors.primary;
+      case WorkspaceSection.controlPanel:
+      case WorkspaceSection.productGuide:
+      case WorkspaceSection.inventory:
+      case WorkspaceSection.auditLog:
+        return AppColors.violet;
+      case WorkspaceSection.production:
+      case WorkspaceSection.supplies:
+      case WorkspaceSection.receipts:
+      case WorkspaceSection.downtime:
+      case WorkspaceSection.containerLoadings:
+        return AppColors.amber;
+      case WorkspaceSection.maintenance:
+      case WorkspaceSection.notifications:
+      case WorkspaceSection.problems:
+        return AppColors.red;
     }
   }
 }
@@ -3126,6 +3160,8 @@ class _ShiftWorkspaceState extends State<ShiftWorkspace> {
                 widget.session.role == UserRole.shiftManager
             ? _DashboardView(state: this)
             : _RoleDashboardView(state: this);
+      case WorkspaceSection.controlPanel:
+        return _ControlPanelView(state: this);
       case WorkspaceSection.shift:
         return _ShiftOverviewView(state: this);
       case WorkspaceSection.notifications:
@@ -4484,6 +4520,7 @@ class _SidebarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = section.accentColor;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: ListTile(
@@ -4492,8 +4529,14 @@ class _SidebarItem extends StatelessWidget {
         selected: selected,
         selectedTileColor: AppColors.primary,
         onTap: onTap,
-        leading: Icon(section.icon,
-            color: selected ? Colors.white : const Color(0xFFB8C5C1), size: 20),
+        leading: Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+                color: selected ? Colors.white.withAlpha(46) : accent.withAlpha(38),
+                borderRadius: BorderRadius.circular(8)),
+            child: Icon(section.icon,
+                color: selected ? Colors.white : accent, size: 17)),
         title: Text(section.label,
             style: TextStyle(
                 color: selected ? Colors.white : const Color(0xFFD9E2DE),
@@ -4888,6 +4931,233 @@ class _KpiCard extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 11, color: color, fontWeight: FontWeight.w700))
           ])));
+}
+
+
+class _ControlPanelView extends StatefulWidget {
+  const _ControlPanelView({required this.state});
+  final _ShiftWorkspaceState state;
+  @override
+  State<_ControlPanelView> createState() => _ControlPanelViewState();
+}
+
+class _ControlPanelViewState extends State<_ControlPanelView> {
+  bool loading = true;
+  List<Map<String, dynamic>> users = [];
+
+  String get token => widget.state.widget.session.accessToken!;
+
+  @override
+  void initState() {
+    super.initState();
+    refresh();
+  }
+
+  Future<void> refresh() async {
+    try {
+      final result = await ApiClient.users(token);
+      if (mounted)
+        setState(() {
+          users = result;
+          loading = false;
+        });
+    } catch (_) {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final activeUsers =
+        users.where((user) => (user['isActive'] as bool? ?? user['is_active'] as bool? ?? true) != false).length;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [AppColors.primary, Color(0xFF0B5C4D)],
+            ),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(38),
+                  borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.admin_panel_settings_outlined,
+                  color: Colors.white, size: 28),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  const Text('لوحة تحكم المدير',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 4),
+                  const Text('أدوات إدارية حصرية لمدير النظام',
+                      style: TextStyle(color: Color(0xFFDCEFE9), fontSize: 12)),
+                ])),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        if (loading) const LinearProgressIndicator(),
+        const SizedBox(height: 4),
+        Wrap(spacing: 10, runSpacing: 10, children: [
+          _KpiCard(
+              icon: Icons.groups_outlined,
+              label: 'المستخدمون',
+              value: '${users.length}',
+              note: '$activeUsers حساب مُفعّل',
+              color: AppColors.primary,
+              soft: AppColors.primarySoft),
+          _KpiCard(
+              icon: Icons.inventory_2_outlined,
+              label: 'رصيد المخزون',
+              value: '${state.inventoryOpening} كجم',
+              note: 'الرصيد الافتتاحي الحالي',
+              color: AppColors.violet,
+              soft: AppColors.violetSoft),
+          _KpiCard(
+              icon: Icons.report_problem_outlined,
+              label: 'مشاكل مفتوحة',
+              value: '${state.openProblems}',
+              note: '${state.problemsCount} مشكلة مسجلة',
+              color:
+                  state.openProblems == 0 ? AppColors.primary : AppColors.red,
+              soft: state.openProblems == 0
+                  ? AppColors.primarySoft
+                  : AppColors.redSoft),
+          _KpiCard(
+              icon: Icons.build_circle_outlined,
+              label: 'أعطال الصيانة',
+              value: '${state.maintenanceCount}',
+              note: '${state.openMaintenance} بلاغ مفتوح',
+              color: AppColors.amber,
+              soft: AppColors.amberSoft),
+          _KpiCard(
+              icon: Icons.track_changes_outlined,
+              label: 'تحقيق المستهدف',
+              value: '${state.liveAchievement.toStringAsFixed(1)}%',
+              note: 'أداء الوردية الحالية',
+              color: state.liveAchievement >= 90
+                  ? AppColors.primary
+                  : AppColors.red,
+              soft: state.liveAchievement >= 90
+                  ? AppColors.primarySoft
+                  : AppColors.redSoft),
+          _KpiCard(
+              icon: Icons.pause_circle_outline,
+              label: 'إجمالي التوقف',
+              value: '${state.downtime} د',
+              note: '${state.openDowntime} توقف مفتوح',
+              color: AppColors.amber,
+              soft: AppColors.amberSoft),
+        ]),
+        const SizedBox(height: 22),
+        const Text('إجراءات سريعة',
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.ink)),
+        const SizedBox(height: 10),
+        Wrap(spacing: 10, runSpacing: 10, children: [
+          _ControlPanelAction(
+              icon: Icons.manage_accounts_outlined,
+              label: 'إدارة المستخدمين',
+              subtitle: 'إضافة وتفعيل/تعطيل الحسابات',
+              color: AppColors.primary,
+              soft: AppColors.primarySoft,
+              onTap: () => state._select(WorkspaceSection.users)),
+          _ControlPanelAction(
+              icon: Icons.tune_outlined,
+              label: 'الرصيد الافتتاحي للمخزون',
+              subtitle: 'تعديل رصيد بداية الفترة',
+              color: AppColors.violet,
+              soft: AppColors.violetSoft,
+              onTap: () => state.editInventoryOpeningBalance(context)),
+          _ControlPanelAction(
+              icon: Icons.history_outlined,
+              label: 'سجل الأحداث',
+              subtitle: 'مراجعة كل العمليات المسجلة',
+              color: AppColors.violet,
+              soft: AppColors.violetSoft,
+              onTap: () => state._select(WorkspaceSection.auditLog)),
+          _ControlPanelAction(
+              icon: Icons.assessment_outlined,
+              label: 'التقارير',
+              subtitle: 'تقارير الورديات وتصديرها',
+              color: AppColors.amber,
+              soft: AppColors.amberSoft,
+              onTap: () => state._select(WorkspaceSection.reports)),
+        ]),
+      ],
+    );
+  }
+}
+
+class _ControlPanelAction extends StatelessWidget {
+  const _ControlPanelAction({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.soft,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final Color color;
+  final Color soft;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+      width: 250,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+              color: Colors.white.withAlpha(235),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border)),
+          child: Row(children: [
+            Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                    color: soft, borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, color: color, size: 21)),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(label,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.ink)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style:
+                          const TextStyle(fontSize: 11, color: AppColors.muted)),
+                ])),
+            const Icon(Icons.chevron_left, color: AppColors.muted, size: 18),
+          ]),
+        ),
+      ));
 }
 
 class _ProductionChart extends StatelessWidget {
