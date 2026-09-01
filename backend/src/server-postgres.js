@@ -127,6 +127,8 @@ async function buildReport(shiftId) {
   const attendanceRate = attendance.required ? Number(attendance.present) / Number(attendance.required) * 100 : 0;
   const absenceRate = attendance.required ? Number(attendance.absent) / Number(attendance.required) * 100 : 0;
   const achievement = production.target ? production.actual / production.target * 100 : 0;
+  const openingBalanceRow = await one("SELECT value FROM app_settings WHERE key = 'inventory_opening_balance'");
+  const openingBalance = Number(openingBalanceRow?.value ?? 0);
   const rejectionRate = Number(quality.inspected) ? Number(quality.rejected) / Number(quality.inspected) * 100 : 0;
   const start = shift.opened_at || `${shift.shift_date}T${shift.starts_at}:00`;
   const end = shift.closed_at || `${shift.shift_date}T${shift.ends_at}:00`;
@@ -139,7 +141,7 @@ async function buildReport(shiftId) {
     achievement,
     rejection_rate: rejectionRate,
     supply_total: supplies.reduce((sum, row) => sum + Number(row.quantity || 0), 0),
-    inventory_balance: 5840 + inventory.received - inventory.issued + inventory.returned,
+    inventory_balance: openingBalance + inventory.received - inventory.issued + inventory.returned,
     attendance_records: attendanceRecords.map((row) => ({
       ...row,
       employee: publicEmployee({
@@ -411,6 +413,22 @@ app.get('/api/users', auth, roles('SYSTEM_ADMIN'), async (_req, res, next) => { 
 app.post('/api/users', auth, roles('SYSTEM_ADMIN'), async (req, res, next) => { try { const b = req.body || {}; if (!b.name || !b.email || !b.password || !b.roleCode) return res.status(400).json({ error: 'INVALID_USER_DATA' }); const user = await one('INSERT INTO users(name,email,password_hash,role_code,department) VALUES($1,$2,$3,$4,$5) RETURNING id,name,email,role_code,department,is_active', [b.name, b.email, bcrypt.hashSync(b.password, 10), b.roleCode, b.department || null]); await audit(req.user.sub, 'USER', user.id, 'CREATE', publicUser(user)); res.status(201).json({ user: publicUser(user) }); } catch (error) { if (error.code === '23505') return res.status(409).json({ error: 'EMAIL_EXISTS' }); next(error); } });
 app.patch('/api/users/:id/status', auth, roles('SYSTEM_ADMIN'), async (req, res, next) => { try { const user = await one('UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id,name,email,role_code,department,is_active', [Boolean(req.body?.isActive), req.params.id]); await audit(req.user.sub, 'USER', user.id, 'STATUS_UPDATE', publicUser(user)); res.json({ user: publicUser(user) }); } catch (error) { next(error); } });
 app.get('/api/roles', auth, roles('SYSTEM_ADMIN'), async (_req, res, next) => { try { res.json({ rows: await many('SELECT code,name FROM roles ORDER BY id') }); } catch (error) { next(error); } });
+app.get('/api/settings/inventory-opening-balance', auth, roles('SYSTEM_ADMIN', 'SHIFT_MANAGER', 'WAREHOUSE'), async (req, res, next) => {
+  try {
+    const row = await one("SELECT value FROM app_settings WHERE key = 'inventory_opening_balance'");
+    res.json({ openingBalance: Number(row?.value ?? 0) });
+  } catch (error) { next(error); }
+});
+app.patch('/api/settings/inventory-opening-balance', auth, roles('SYSTEM_ADMIN'), async (req, res, next) => {
+  try {
+    const value = Number(req.body?.openingBalance);
+    if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'INVALID_OPENING_BALANCE' });
+    await pool.query("INSERT INTO app_settings(key,value,updated_at,updated_by) VALUES('inventory_opening_balance',$1,now(),$2) ON CONFLICT(key) DO UPDATE SET value=$1, updated_at=now(), updated_by=$2", [String(value), req.user.sub]);
+    await audit(req.user.sub, 'SETTING', 0, 'UPDATE_INVENTORY_OPENING_BALANCE', { openingBalance: value });
+    res.json({ openingBalance: value });
+  } catch (error) { next(error); }
+});
+
 app.post('/api/shifts', auth, roles('SHIFT_MANAGER', 'SYSTEM_ADMIN'), async (req, res, next) => { try { const b = req.body || {}; const shiftNo = String(b.shiftNo || '').trim(); const date = b.shiftDate || new Date().toISOString().slice(0, 10); if (!shiftNo) return res.status(400).json({ error: 'INVALID_SHIFT' }); const shift = await one('INSERT INTO shifts(shift_no,shift_date,starts_at,ends_at,status,manager_id,opened_at) VALUES($1,$2,$3,$4,\'RUNNING\',$5,now()) RETURNING *', [shiftNo, date, b.startsAt || '16:00', b.endsAt || '00:00', req.user.sub]); await audit(req.user.sub, 'SHIFT', shift.id, 'OPEN', shift); res.status(201).json({ shift }); } catch (error) { if (error.code === '23505') return res.status(409).json({ error: 'SHIFT_NO_EXISTS' }); next(error); } });
 app.get('/api/shifts/:id/close-review', auth, roles('SHIFT_MANAGER', 'SYSTEM_ADMIN'), async (req, res, next) => { try { const shift = await one('SELECT * FROM shifts WHERE id = $1', [req.params.id]); if (!shift) return res.status(404).json({ error: 'SHIFT_NOT_FOUND' }); const [attendance, production, fridges, downtime, quality, maintenance, receipts, problems] = await Promise.all([one('SELECT COUNT(*)::int AS count FROM attendance WHERE shift_id=$1', [req.params.id]), one('SELECT COUNT(*)::int AS count FROM production_hourly WHERE shift_id=$1', [req.params.id]), one('SELECT COUNT(*)::int AS count FROM fridge_readings WHERE shift_id=$1', [req.params.id]), one("SELECT COUNT(*)::int AS count FROM downtime WHERE shift_id=$1 AND status <> 'CLOSED'", [req.params.id]), one('SELECT COUNT(*)::int AS count FROM quality_checks WHERE shift_id=$1', [req.params.id]), one("SELECT COUNT(*)::int AS count FROM maintenance_tickets WHERE shift_id=$1 AND status NOT IN ('CLOSED','RESOLVED')", [req.params.id]), one('SELECT COUNT(*)::int AS count FROM raw_receipts WHERE receipt_date=$1', [shift.shift_date]), one("SELECT COUNT(*)::int AS count FROM problems WHERE shift_id=$1 AND status NOT IN ('RESOLVED','CLOSED')", [req.params.id])]); const item = (label, count, required = false) => ({ key: label, label, status: count > 0 && required ? 'COMPLETE' : count > 0 ? 'WARNING' : 'PROBLEM', detail: String(count) }); const items = [item('الحضور', attendance.count, true), item('الإنتاج', production.count, true), item('قراءات الثلاجات', fridges.count, true), item('التوقفات المفتوحة', downtime.count), item('الجودة', quality.count, true), item('أعطال الصيانة المفتوحة', maintenance.count), item('الاستلامات', receipts.count), item('المشاكل المفتوحة', problems.count)]; res.json({ review: { shift, items, hasProblems: items.some((row) => row.status === 'PROBLEM' || row.status === 'WARNING') } }); } catch (error) { next(error); } });
 app.get('/api/shifts/:id/problems', auth, roles('SYSTEM_ADMIN', 'SHIFT_MANAGER', 'PRODUCTION', 'PRODUCTION_ENGINEER', 'QUALITY', 'QUALITY_ENGINEER', 'MAINTENANCE', 'WAREHOUSE'), async (req, res, next) => { try { res.json({ rows: await many('SELECT * FROM problems WHERE shift_id=$1 ORDER BY id DESC', [req.params.id]) }); } catch (error) { next(error); } });
@@ -500,7 +518,8 @@ async function ensureSchemaAndSeed() {
     ['فرد الأمن التجريبي', 'security@wardia.app', 'Security@123456', 'SECURITY', 'الأمن'],
   ];
   for (const [name, email, plainPassword, role, department] of demoUsers) await pool.query('INSERT INTO users(name,email,password_hash,role_code,department) VALUES($1,$2,$3,$4,$5) ON CONFLICT(email) DO NOTHING', [name, email, bcrypt.hashSync(plainPassword, 10), role, department]);
-  await pool.query(`INSERT INTO shifts(shift_no,shift_date,starts_at,ends_at,status,manager_id,opened_at) SELECT 'SHIFT-2026-08-21-02','2026-08-21','16:00','00:00','RUNNING',id,now() FROM users WHERE email='manager@wardia.app' ON CONFLICT(shift_no) DO NOTHING`);
+    await pool.query("INSERT INTO app_settings(key,value) VALUES('inventory_opening_balance','0') ON CONFLICT(key) DO NOTHING");
+await pool.query(`INSERT INTO shifts(shift_no,shift_date,starts_at,ends_at,status,manager_id,opened_at) SELECT 'SHIFT-2026-08-21-02','2026-08-21','16:00','00:00','RUNNING',id,now() FROM users WHERE email='manager@wardia.app' ON CONFLICT(shift_no) DO NOTHING`);
 }
 
 // Start listening immediately so Railway's healthcheck can reach /api/health

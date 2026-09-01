@@ -703,6 +703,28 @@ class ApiClient {
         .toList();
   }
 
+  static Future<int> loadInventoryOpeningBalance(String token) async {
+    final response = await http.get(
+        _uri('/api/settings/inventory-opening-balance'),
+        headers: {
+          'Authorization': 'Bearer $token'
+        }).timeout(const Duration(seconds: 25));
+    if (response.statusCode != 200) throw Exception('SETTING_LOAD_FAILED');
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return ((payload['openingBalance'] as num?) ?? 0).toInt();
+  }
+
+  static Future<void> updateInventoryOpeningBalance(
+      String token, int value) async {
+    final response = await http
+        .patch(_uri('/api/settings/inventory-opening-balance'), headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        }, body: jsonEncode({'openingBalance': value}))
+        .timeout(const Duration(seconds: 25));
+    if (response.statusCode != 200) throw Exception('SETTING_UPDATE_FAILED');
+  }
+
   static Future<void> createSupply(String token, int quantity,
       {int shiftId = 1}) async {
     final response = await http
@@ -2581,7 +2603,7 @@ class _ShiftWorkspaceState extends State<ShiftWorkspace> {
       time: '20:18',
     ),
   ];
-  int inventoryOpening = 5840;
+  int inventoryOpening = 0;
 
   @override
   void initState() {
@@ -2701,6 +2723,10 @@ class _ShiftWorkspaceState extends State<ShiftWorkspace> {
             });
         } catch (_) {}
       }
+        try {
+          final opening = await ApiClient.loadInventoryOpeningBalance(token);
+          if (mounted) setState(() => inventoryOpening = opening);
+        } catch (_) {}
       if (widget.session.role.canView(WorkspaceSection.supplies)) {
         try {
           final rows = await ApiClient.loadModule(token, 'supplies');
@@ -3034,6 +3060,46 @@ class _ShiftWorkspaceState extends State<ShiftWorkspace> {
         return;
       default:
         _showSavedMessage('نموذج هذه الوحدة سيضاف في المرحلة التالية');
+    }
+  }
+
+
+  Future<void> editInventoryOpeningBalance(BuildContext context) async {
+    final controller = TextEditingController(text: '$inventoryOpening');
+    final result = await showDialog<int>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('تعديل الرصيد الافتتاحي للمخزن'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'الرصيد الافتتاحي (كجم)'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء')),
+          FilledButton(
+              onPressed: () {
+                final value = int.tryParse(controller.text.trim());
+                if (value == null || value < 0) return;
+                Navigator.pop(context, value);
+              },
+              child: const Text('حفظ')),
+        ],
+      ),
+    );
+    if (result != null && mounted) {
+      try {
+        await ApiClient.updateInventoryOpeningBalance(
+            widget.session.accessToken!, result);
+      } catch (_) {
+        _showSavedMessage('تعذر حفظ الرصيد الافتتاحي على الخادم');
+        return;
+      }
+      setState(() => inventoryOpening = result);
+      _showSavedMessage('تم تحديث الرصيد الافتتاحي بنجاح');
     }
   }
 
@@ -7679,7 +7745,16 @@ class _ModuleView extends StatelessWidget {
             FilledButton.icon(
                 onPressed: () => state.openAddDialog(context),
                 icon: const Icon(Icons.add),
-                label: const Text('إضافة سجل'))
+                label: const Text('إضافة سجل')),
+            if (section == WorkspaceSection.inventory &&
+                state.widget.session.role == UserRole.systemAdmin) ...[
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                  onPressed: () =>
+                      state.editInventoryOpeningBalance(context),
+                  icon: const Icon(Icons.settings_outlined),
+                  label: const Text('الرصيد الافتتاحي')),
+            ]
           ]),
           const SizedBox(height: 16),
           _ModuleSummary(section: section, state: state),
