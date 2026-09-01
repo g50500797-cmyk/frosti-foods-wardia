@@ -19,6 +19,13 @@ const pool = new Pool({
 pool.on('error', (error) => console.error('Postgres pool error (idle client):', error.message));
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    console.log('[req]', req.method, req.originalUrl, '->', res.statusCode, (Date.now() - startedAt) + 'ms');
+  });
+  next();
+});
 
 const publicUser = (user) => ({ id: user.id, name: user.name, email: user.email, role: user.role_code, department: user.department, isActive: user.is_active });
 const calculated = (row) => ({ ...row, difference: row.actual_qty - row.target_qty, achievement: row.target_qty ? row.actual_qty / row.target_qty * 100 : 0 });
