@@ -9,6 +9,8 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 
 const app = express();
+app.disable('etag'); // API responses must never be served as a cached 304 with an empty body
+app.use((req, res, next) => { if (req.path.startsWith('/api')) res.set('Cache-Control', 'no-store'); next(); });
 const port = Number(process.env.PORT || 5521);
 const jwtSecret = process.env.JWT_SECRET || 'local-development-only';
 const pool = new Pool({
