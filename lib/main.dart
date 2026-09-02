@@ -77,11 +77,25 @@ class _AuthGateState extends State<AuthGate> {
     }
     final token = await SessionStorage.readToken();
     if (token != null && token.isNotEmpty) {
-      try {
-        final session = await ApiClient.me(token);
-        if (mounted) setState(() => _session = session);
-      } catch (_) {
-        await SessionStorage.clear();
+      for (var attempt = 0; attempt < 2; attempt++) {
+        try {
+          final session = await ApiClient.me(token);
+          if (mounted) setState(() => _session = session);
+          break;
+        } catch (e, st) {
+          // ignore: avoid_print
+          print('[_restoreSession] attempt ${attempt + 1} failed: $e\n$st');
+          if (e.toString().contains('SESSION_INVALID')) {
+            await SessionStorage.clear();
+            break;
+          }
+          if (attempt == 0) {
+            await Future.delayed(const Duration(seconds: 2));
+          }
+          // transient failure (timeout / network / server error) even after
+          // retry: keep the saved token instead of forcing the user to log
+          // back in. _syncFromApi will keep retrying once the app is open.
+        }
       }
     }
     if (mounted) setState(() => _restoring = false);
@@ -269,19 +283,12 @@ class UserSession {
 }
 
 class ApiClient {
-  static const _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
+  static const _configuredBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://wardia-api-production.up.railway.app',
+  );
 
-  static Uri _uri(String path) {
-    if (_configuredBaseUrl.isNotEmpty)
-      return Uri.parse('$_configuredBaseUrl$path');
-    final host = Uri.base.host.isEmpty ? '127.0.0.1' : Uri.base.host;
-    final scheme = Uri.base.scheme == 'https' ? 'https' : 'http';
-    final port =
-        Uri.base.port == 80 || Uri.base.port == 443 || Uri.base.port == 8080
-            ? Uri.base.port
-            : 5521;
-    return Uri(scheme: scheme, host: host, port: port, path: path);
-  }
+  static Uri _uri(String path) => Uri.parse('$_configuredBaseUrl$path');
 
   static Future<UserSession> login(String email, String password) async {
     final response = await http
@@ -309,7 +316,12 @@ class ApiClient {
     final response = await http.get(_uri('/api/me'), headers: {
       'Authorization': 'Bearer $token'
     }).timeout(const Duration(seconds: 25));
-    if (response.statusCode != 200) throw Exception('SESSION_INVALID');
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception('SESSION_INVALID');
+    }
+    if (response.statusCode != 200) {
+      throw Exception('SESSION_CHECK_FAILED:${response.statusCode}');
+    }
     final user = (jsonDecode(response.body) as Map<String, dynamic>)['user']
         as Map<String, dynamic>;
     return UserSession(
@@ -2658,6 +2670,7 @@ class _ShiftWorkspaceState extends State<ShiftWorkspace> {
   Future<void> _syncFromApi({bool silent = false}) async {
     final token = widget.session.accessToken;
     if (token == null) return;
+    for (var attempt = 0; attempt < 2; attempt++) {
     try {
       final shiftRecord = await ApiClient.loadCurrentShiftRecord(token);
       final snapshot = await ApiClient.loadCurrentShift(token,
@@ -2776,10 +2789,18 @@ class _ShiftWorkspaceState extends State<ShiftWorkspace> {
             });
         } catch (_) {}
       }
-    } catch (_) {
+      return;
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('[_syncFromApi] attempt ${attempt + 1} failed: $e\n$st');
+      if (attempt == 0) {
+        await Future.delayed(const Duration(seconds: 2));
+        continue;
+      }
       if (mounted && !silent)
         _showSavedMessage(
             'تعذر تحديث البيانات من الخادم، تم عرض آخر بيانات متاحة');
+    }
     }
   }
 
