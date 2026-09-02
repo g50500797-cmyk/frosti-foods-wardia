@@ -33,6 +33,34 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script>
+    // One-time cleanup: some devices still have an old service worker
+    // installed from an earlier build (before caching was disabled server
+    // side). That old worker keeps serving its own cached copy of the app
+    // forever, ignoring every new deploy, because it lives in a separate
+    // storage area that normal "clear cache" doesn't touch. This runs on
+    // every page load, and the very first time it finds a leftover worker
+    // it removes it, clears its cache, and reloads once automatically so
+    // the current server-served build finally takes over.
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+      if (sessionStorage.getItem('sw_cleanup_done_v1')) return;
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        var hadOne = registrations.length > 0;
+        Promise.all(registrations.map(function (r) { return r.unregister(); }))
+          .then(function () {
+            if (!('caches' in window)) return;
+            return caches.keys().then(function (names) {
+              return Promise.all(names.map(function (n) { return caches.delete(n); }));
+            });
+          })
+          .then(function () {
+            sessionStorage.setItem('sw_cleanup_done_v1', '1');
+            if (hadOne) location.reload();
+          });
+      });
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
