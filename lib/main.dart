@@ -2947,7 +2947,24 @@ class _ShiftWorkspaceState extends State<ShiftWorkspace> {
           Expanded(
             child: _PhotoBackdrop(
               child: SafeArea(
-                child: _sectionBody(),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 320),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                              begin: const Offset(0, 0.03), end: Offset.zero)
+                          .animate(animation),
+                      child: child,
+                    ),
+                  ),
+                  child: KeyedSubtree(
+                    key: ValueKey(_section),
+                    child: _sectionBody(),
+                  ),
+                ),
               ),
             ),
           ),
@@ -4555,25 +4572,39 @@ class _SidebarItem extends StatelessWidget {
     final accent = section.accentColor;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: ListTile(
-        dense: true,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        selected: selected,
-        selectedTileColor: AppColors.primary,
-        onTap: onTap,
-        leading: Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-                color: selected ? Colors.white.withAlpha(46) : accent.withAlpha(38),
-                borderRadius: BorderRadius.circular(8)),
-            child: Icon(section.icon,
-                color: selected ? Colors.white : accent, size: 17)),
-        title: Text(section.label,
-            style: TextStyle(
-                color: selected ? Colors.white : const Color(0xFFD9E2DE),
-                fontSize: 13,
-                fontWeight: selected ? FontWeight.w900 : FontWeight.w600)),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+            color: selected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(8)),
+        child: ListTile(
+          dense: true,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          onTap: onTap,
+          leading: AnimatedScale(
+              scale: selected ? 1.08 : 1.0,
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutBack,
+              child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 260),
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                      color: selected
+                          ? Colors.white.withAlpha(46)
+                          : accent.withAlpha(38),
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Icon(section.icon,
+                      color: selected ? Colors.white : accent, size: 17))),
+          title: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 260),
+              style: TextStyle(
+                  color: selected ? Colors.white : const Color(0xFFD9E2DE),
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w900 : FontWeight.w600),
+              child: Text(section.label)),
+        ),
       ),
     );
   }
@@ -4720,7 +4751,12 @@ class _DashboardView extends StatelessWidget {
                   color: AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(8)),
               child: Row(children: [
-                const Icon(Icons.circle, color: AppColors.primary, size: 10),
+                _PulsingDot(
+                    color: AppColors.primary,
+                    size: 10,
+                    animate: state.currentShift?.status != 'PAUSED' &&
+                        state.currentShift?.status != 'CLOSED' &&
+                        state.currentShift?.status != 'COMPLETED'),
                 const SizedBox(width: 7),
                 Text(
                     state.currentShift?.status == 'PAUSED'
@@ -4909,6 +4945,84 @@ class _DashboardEnhancementsState extends State<_DashboardEnhancements> {
             ]));
 }
 
+class _FadeSlideIn extends StatefulWidget {
+  const _FadeSlideIn({required this.child, this.delay = Duration.zero});
+  final Widget child;
+  final Duration delay;
+  @override
+  State<_FadeSlideIn> createState() => _FadeSlideInState();
+}
+
+class _FadeSlideInState extends State<_FadeSlideIn> {
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(widget.delay, () {
+      if (mounted) setState(() => _visible = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedOpacity(
+        opacity: _visible ? 1 : 0,
+        duration: const Duration(milliseconds: 480),
+        curve: Curves.easeOutCubic,
+        child: AnimatedSlide(
+          offset: _visible ? Offset.zero : const Offset(0, 0.16),
+          duration: const Duration(milliseconds: 480),
+          curve: Curves.easeOutCubic,
+          child: AnimatedScale(
+            scale: _visible ? 1 : 0.90,
+            duration: const Duration(milliseconds: 480),
+            curve: Curves.easeOutBack,
+            child: widget.child,
+          ),
+        ),
+      );
+}
+
+class _PulsingDot extends StatefulWidget {
+  const _PulsingDot(
+      {required this.color, this.size = 10, this.animate = true});
+  final Color color;
+  final double size;
+  final bool animate;
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1100))
+    ..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dot = Icon(Icons.circle, color: widget.color, size: widget.size);
+    if (!widget.animate) return dot;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value;
+        return Opacity(
+          opacity: 0.55 + 0.45 * t,
+          child: Transform.scale(scale: 0.85 + 0.3 * t, child: child),
+        );
+      },
+      child: dot,
+    );
+  }
+}
+
 class _KpiCard extends StatelessWidget {
   const _KpiCard(
       {required this.icon,
@@ -4924,7 +5038,8 @@ class _KpiCard extends StatelessWidget {
   final Color color;
   final Color soft;
   @override
-  Widget build(BuildContext context) => SizedBox(
+  Widget build(BuildContext context) => _FadeSlideIn(
+      child: SizedBox(
       width: 205,
       child: Container(
           padding: const EdgeInsets.all(13),
@@ -4962,7 +5077,7 @@ class _KpiCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                     fontSize: 11, color: color, fontWeight: FontWeight.w700))
-          ])));
+          ]))));
 }
 
 
@@ -5136,7 +5251,7 @@ class _ControlPanelViewState extends State<_ControlPanelView> {
   }
 }
 
-class _ControlPanelAction extends StatelessWidget {
+class _ControlPanelAction extends StatefulWidget {
   const _ControlPanelAction({
     required this.icon,
     required this.label,
@@ -5153,41 +5268,58 @@ class _ControlPanelAction extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_ControlPanelAction> createState() => _ControlPanelActionState();
+}
+
+class _ControlPanelActionState extends State<_ControlPanelAction> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) => SizedBox(
       width: 250,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-              color: Colors.white.withAlpha(235),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.border)),
-          child: Row(children: [
-            Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                    color: soft, borderRadius: BorderRadius.circular(10)),
-                child: Icon(icon, color: color, size: 21)),
-            const SizedBox(width: 12),
-            Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text(label,
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink)),
-                  const SizedBox(height: 2),
-                  Text(subtitle,
-                      style:
-                          const TextStyle(fontSize: 11, color: AppColors.muted)),
-                ])),
-            const Icon(Icons.chevron_left, color: AppColors.muted, size: 18),
-          ]),
+      child: AnimatedScale(
+        scale: _pressed ? 0.96 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: widget.onTap,
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+                color: Colors.white.withAlpha(235),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.border)),
+            child: Row(children: [
+              Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                      color: widget.soft,
+                      borderRadius: BorderRadius.circular(10)),
+                  child: Icon(widget.icon, color: widget.color, size: 21)),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(widget.label,
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.ink)),
+                    const SizedBox(height: 2),
+                    Text(widget.subtitle,
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.muted)),
+                  ])),
+              const Icon(Icons.chevron_left,
+                  color: AppColors.muted, size: 18),
+            ]),
+          ),
         ),
       ));
 }
