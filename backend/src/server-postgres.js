@@ -19,7 +19,21 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 pool.on('error', (error) => console.error('Postgres pool error (idle client):', error.message));
-app.use(cors());
+app.set('trust proxy', 1); // Railway sits behind a reverse proxy; needed for req.ip to be the real client IP
+const allowedOrigin = process.env.ALLOWED_ORIGIN || 'https://wardia-api-production.up.railway.app';
+app.use(cors({
+  origin: (origin, callback) => {
+    // No Origin header covers same-origin browser requests, curl, health checks, server-to-server calls.
+    if (!origin || origin === allowedOrigin) return callback(null, true);
+    return callback(null, false);
+  },
+}));
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('Referrer-Policy', 'no-referrer');
+  next();
+});
 app.use(express.json({ limit: '1mb' }));
 app.use((req, res, next) => {
   const startedAt = Date.now();
@@ -206,7 +220,30 @@ app.get('/api/health', async (_req, res) => {
   try { await pool.query('SELECT 1'); res.json({ ok: true, service: 'wardia-shift-api', storage: 'postgresql', time: new Date().toISOString() }); }
   catch { res.status(503).json({ ok: false, storage: 'postgresql' }); }
 });
-app.post('/api/auth/login', async (req, res, next) => {
+const loginAttempts = new Map();
+const LOGIN_WINDOW_MS = 10 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 8;
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of loginAttempts) {
+    if (now - entry.windowStart > LOGIN_WINDOW_MS) loginAttempts.delete(ip);
+  }
+}, LOGIN_WINDOW_MS).unref();
+function loginRateLimit(req, res, next) {
+  const ip = req.ip || 'unknown';
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now - entry.windowStart > LOGIN_WINDOW_MS) {
+    loginAttempts.set(ip, { count: 1, windowStart: now });
+    return next();
+  }
+  entry.count += 1;
+  if (entry.count > LOGIN_MAX_ATTEMPTS) {
+    return res.status(429).json({ error: 'TOO_MANY_ATTEMPTS', message: 'محاولات دخول كثيرة، حاول تاني بعد شوية' });
+  }
+  next();
+}
+app.post('/api/auth/login', loginRateLimit, async (req, res, next) => {
   try {
     const email = String(req.body?.email || '').trim();
     const password = String(req.body?.password || '');
