@@ -282,6 +282,17 @@ class UserSession {
   bool canView(WorkspaceSection section) => role.canView(section);
 }
 
+// Backend numeric fields (especially COUNT()/SUM() results from Postgres,
+// which serialize BIGINT/NUMERIC columns as JSON strings) can arrive as
+// either a num or a numeric String. This parses both instead of throwing
+// a TypeError that used to abort the entire data sync.
+num? _asNum(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v;
+  if (v is String) return num.tryParse(v);
+  return null;
+}
+
 class ApiClient {
   static const _configuredBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
@@ -403,37 +414,37 @@ class ApiClient {
         .map((item) => item as Map<String, dynamic>)
         .map((item) => HourlyProduction(
               hour: item['hour_started_at'] as String,
-              target: (item['target_qty'] as num).toInt(),
-              actual: (item['actual_qty'] as num).toInt(),
+              target: (_asNum(item['target_qty']) ?? 0).toInt(),
+              actual: (_asNum(item['actual_qty']) ?? 0).toInt(),
               line: item['line_code'] as String,
             ))
         .toList();
     return ApiShiftSnapshot(
-      shiftId: (shiftId as num).toInt(),
+      shiftId: (_asNum(shiftId) ?? 0).toInt(),
       hourly: rows,
-      present: (attendance['present'] as num?)?.toInt() ?? 0,
-      absent: (attendance['absent'] as num?)?.toInt() ?? 0,
-      late: (attendance['late'] as num?)?.toInt() ?? 0,
-      qualityInspected: (quality['inspected'] as num?)?.toInt() ?? 0,
-      qualityRejected: (quality['rejected'] as num?)?.toInt() ?? 0,
-      downtime: (downtimeTotals['minutes'] as num?)?.toInt() ??
-          (productionTotals['downtime'] as num?)?.toInt() ??
+      present: _asNum(attendance['present'])?.toInt() ?? 0,
+      absent: _asNum(attendance['absent'])?.toInt() ?? 0,
+      late: _asNum(attendance['late'])?.toInt() ?? 0,
+      qualityInspected: _asNum(quality['inspected'])?.toInt() ?? 0,
+      qualityRejected: _asNum(quality['rejected'])?.toInt() ?? 0,
+      downtime: _asNum(downtimeTotals['minutes'])?.toInt() ??
+          _asNum(productionTotals['downtime'])?.toInt() ??
           0,
-      requiredWorkers: (attendance['required'] as num?)?.toInt() ?? 0,
-      target: (productionTotals['target'] as num?)?.toInt() ?? 0,
-      actual: (productionTotals['actual'] as num?)?.toInt() ?? 0,
-      waste: (productionTotals['waste'] as num?)?.toInt() ?? 0,
-      rejected: (productionTotals['rejected'] as num?)?.toInt() ?? 0,
-      openDowntime: (downtimeTotals['open_count'] as num?)?.toInt() ?? 0,
-      maintenanceCount: (maintenanceTotals['count'] as num?)?.toInt() ?? 0,
-      openMaintenance: (maintenanceTotals['open_count'] as num?)?.toInt() ?? 0,
-      fridgeRequired: (fridgeTotals['required'] as num?)?.toInt() ?? 40,
-      fridgeCompleted: (fridgeTotals['completed'] as num?)?.toInt() ?? 0,
-      fridgeMissing: (fridgeTotals['missing'] as num?)?.toInt() ?? 40,
-      fridgeDefrost: (fridgeTotals['defrost'] as num?)?.toInt() ?? 0,
-      problemsCount: (problemTotals['count'] as num?)?.toInt() ?? 0,
-      openProblems: (problemTotals['open_count'] as num?)?.toInt() ?? 0,
-      containersCount: (containerTotals['count'] as num?)?.toInt() ?? 0,
+      requiredWorkers: _asNum(attendance['required'])?.toInt() ?? 0,
+      target: _asNum(productionTotals['target'])?.toInt() ?? 0,
+      actual: _asNum(productionTotals['actual'])?.toInt() ?? 0,
+      waste: _asNum(productionTotals['waste'])?.toInt() ?? 0,
+      rejected: _asNum(productionTotals['rejected'])?.toInt() ?? 0,
+      openDowntime: _asNum(downtimeTotals['open_count'])?.toInt() ?? 0,
+      maintenanceCount: _asNum(maintenanceTotals['count'])?.toInt() ?? 0,
+      openMaintenance: _asNum(maintenanceTotals['open_count'])?.toInt() ?? 0,
+      fridgeRequired: _asNum(fridgeTotals['required'])?.toInt() ?? 40,
+      fridgeCompleted: _asNum(fridgeTotals['completed'])?.toInt() ?? 0,
+      fridgeMissing: _asNum(fridgeTotals['missing'])?.toInt() ?? 40,
+      fridgeDefrost: _asNum(fridgeTotals['defrost'])?.toInt() ?? 0,
+      problemsCount: _asNum(problemTotals['count'])?.toInt() ?? 0,
+      openProblems: _asNum(problemTotals['open_count'])?.toInt() ?? 0,
+      containersCount: _asNum(containerTotals['count'])?.toInt() ?? 0,
       notifications: (dashboard['notifications'] as List<dynamic>? ?? const [])
           .map((row) => Map<String, dynamic>.from(row as Map))
           .toList(),
@@ -509,12 +520,12 @@ class ApiClient {
       records: (payload['rows'] as List<dynamic>? ?? const [])
           .map((row) => AttendanceRecord.fromJson(row as Map<String, dynamic>))
           .toList(),
-      total: (summary['total'] as num?)?.toInt() ?? 0,
-      present: (summary['present'] as num?)?.toInt() ?? 0,
-      absent: (summary['absent'] as num?)?.toInt() ?? 0,
-      late: (summary['late'] as num?)?.toInt() ?? 0,
-      attendanceRate: (summary['attendanceRate'] as num?)?.toDouble() ?? 0,
-      absenceRate: (summary['absenceRate'] as num?)?.toDouble() ?? 0,
+      total: _asNum(summary['total'])?.toInt() ?? 0,
+      present: _asNum(summary['present'])?.toInt() ?? 0,
+      absent: _asNum(summary['absent'])?.toInt() ?? 0,
+      late: _asNum(summary['late'])?.toInt() ?? 0,
+      attendanceRate: _asNum(summary['attendanceRate'])?.toDouble() ?? 0,
+      absenceRate: _asNum(summary['absenceRate'])?.toDouble() ?? 0,
     );
   }
 
@@ -724,7 +735,7 @@ class ApiClient {
         }).timeout(const Duration(seconds: 25));
     if (response.statusCode != 200) throw Exception('SETTING_LOAD_FAILED');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    return ((payload['openingBalance'] as num?) ?? 0).toInt();
+    return (_asNum(payload['openingBalance']) ?? 0).toInt();
   }
 
   static Future<void> updateInventoryOpeningBalance(
@@ -1105,7 +1116,7 @@ class ApiClient {
         as Map<String, dynamic>?;
     if (row == null) throw Exception('SHIFT_NOT_FOUND');
     return ShiftRecord(
-        id: (row['id'] as num?)?.toInt() ?? 1,
+        id: _asNum(row['id'])?.toInt() ?? 1,
         number: row['shift_no'] as String? ?? '',
         date: row['shift_date'] as String? ?? '',
         start: row['starts_at'] as String? ?? '',
@@ -1714,10 +1725,10 @@ class ProductionEntry {
           line: json['line_code'] as String? ?? '',
           machine: json['machine_name'] as String? ?? '',
           product: json['product_name'] as String? ?? '',
-          workers: (json['workers_count'] as num?)?.toInt() ?? 0,
-          target: (json['target_qty'] as num?)?.toInt() ?? 0,
-          actual: (json['actual_qty'] as num?)?.toInt() ?? 0,
-          downtime: (json['downtime_minutes'] as num?)?.toInt() ?? 0,
+          workers: _asNum(json['workers_count'])?.toInt() ?? 0,
+          target: _asNum(json['target_qty'])?.toInt() ?? 0,
+          actual: _asNum(json['actual_qty'])?.toInt() ?? 0,
+          downtime: _asNum(json['downtime_minutes'])?.toInt() ?? 0,
           downtimeReason: json['downtime_reason'] as String? ?? '',
           notes: json['notes'] as String? ?? '');
   final String department, hour, line, machine, product, downtimeReason, notes;
@@ -1749,12 +1760,12 @@ class ProductionTotals {
       this.products = 0});
   factory ProductionTotals.fromJson(Map<String, dynamic> json) =>
       ProductionTotals(
-          target: (json['target'] as num?)?.toInt() ?? 0,
-          actual: (json['actual'] as num?)?.toInt() ?? 0,
-          achievement: (json['achievement'] as num?)?.toDouble() ?? 0,
-          downtime: (json['downtime'] as num?)?.toInt() ?? 0,
-          hours: (json['hours'] as num?)?.toInt() ?? 0,
-          products: (json['products'] as num?)?.toInt() ?? 0);
+          target: _asNum(json['target'])?.toInt() ?? 0,
+          actual: _asNum(json['actual'])?.toInt() ?? 0,
+          achievement: _asNum(json['achievement'])?.toDouble() ?? 0,
+          downtime: _asNum(json['downtime'])?.toInt() ?? 0,
+          hours: _asNum(json['hours'])?.toInt() ?? 0,
+          products: _asNum(json['products'])?.toInt() ?? 0);
   final int target, actual, downtime, hours, products;
   final double achievement;
 }
@@ -1783,12 +1794,12 @@ class ProductGuide {
       this.steps = const [],
       this.imageUrl});
   factory ProductGuide.fromJson(Map<String, dynamic> json) => ProductGuide(
-      id: (json['id'] as num?)?.toInt() ?? 0,
+      id: _asNum(json['id'])?.toInt() ?? 0,
       code: json['productCode'] as String? ?? '',
       name: json['name'] as String? ?? '',
       department: json['department'] as String? ?? 'PACKING',
       rawMaterial: json['rawMaterial'] as String? ?? '',
-      packWeight: (json['packWeight'] as num?)?.toDouble(),
+      packWeight: _asNum(json['packWeight'])?.toDouble(),
       packSize: json['packSize'] as String? ?? '',
       size: json['size'] as String? ?? '',
       temperature: json['temperature'] as String?,
@@ -1839,11 +1850,11 @@ class Fridge {
       this.minTemp,
       this.maxTemp});
   factory Fridge.fromJson(Map<String, dynamic> json) => Fridge(
-      id: (json['id'] as num).toInt(),
+      id: (_asNum(json['id']) ?? 0).toInt(),
       no: json['fridgeNo'] as String? ?? '',
       name: json['name'] as String? ?? '',
-      minTemp: (json['minTemp'] as num?)?.toDouble(),
-      maxTemp: (json['maxTemp'] as num?)?.toDouble());
+      minTemp: _asNum(json['minTemp'])?.toDouble(),
+      maxTemp: _asNum(json['maxTemp'])?.toDouble());
   final int id;
   final String no, name;
   final double? minTemp, maxTemp;
@@ -1863,7 +1874,7 @@ class FridgeReading {
         fridge: fridge['name'] as String? ?? '',
         date: json['readingDate'] as String? ?? '',
         hour: json['readingHour'] as String? ?? '',
-        temperature: (json['temperature'] as num?)?.toDouble() ?? 0,
+        temperature: _asNum(json['temperature'])?.toDouble() ?? 0,
         status: json['status'] as String? ?? 'NORMAL',
         notes: json['notes'] as String?);
   }
@@ -1880,11 +1891,11 @@ class FridgeTotals {
       this.compliance = 0,
       this.defrost = 0});
   factory FridgeTotals.fromJson(Map<String, dynamic> json) => FridgeTotals(
-      required: (json['required'] as num?)?.toInt() ?? 40,
-      completed: (json['completed'] as num?)?.toInt() ?? 0,
-      missing: (json['missing'] as num?)?.toInt() ?? 0,
-      compliance: (json['compliance'] as num?)?.toDouble() ?? 0,
-      defrost: (json['defrost'] as num?)?.toInt() ?? 0);
+      required: _asNum(json['required'])?.toInt() ?? 40,
+      completed: _asNum(json['completed'])?.toInt() ?? 0,
+      missing: _asNum(json['missing'])?.toInt() ?? 0,
+      compliance: _asNum(json['compliance'])?.toDouble() ?? 0,
+      defrost: _asNum(json['defrost'])?.toInt() ?? 0);
   final int required, completed, missing, defrost;
   final double compliance;
 }
@@ -1913,13 +1924,13 @@ class RawReceipt {
       time: json['receiptTime'] as String? ?? '',
       material: json['materialName'] as String? ?? '',
       supplier: json['supplier'] as String? ?? '',
-      gross: (json['grossWeight'] as num?)?.toDouble() ?? 0,
-      discountRate: (json['discountRate'] as num?)?.toDouble() ?? 0,
+      gross: _asNum(json['grossWeight'])?.toDouble() ?? 0,
+      discountRate: _asNum(json['discountRate'])?.toDouble() ?? 0,
       supplierCode: json['supplierCode'] as String? ?? '',
       defects: json['defects'] as String? ?? '',
       notes: json['notes'] as String? ?? '',
-      discount: (json['discountAmount'] as num?)?.toDouble() ?? 0,
-      net: (json['netWeight'] as num?)?.toDouble() ?? 0);
+      discount: _asNum(json['discountAmount'])?.toDouble() ?? 0,
+      net: _asNum(json['netWeight'])?.toDouble() ?? 0);
   final String date, time, material, supplier, supplierCode, defects, notes;
   final double gross, discountRate, discount, net;
   Map<String, dynamic> toJson() => {
@@ -1944,13 +1955,13 @@ class ReceiptTotals {
       this.averageDiscountRate = 0,
       this.suppliers = 0});
   factory ReceiptTotals.fromJson(Map<String, dynamic> json) => ReceiptTotals(
-      count: (json['count'] as num?)?.toInt() ?? 0,
-      gross: (json['gross'] as num?)?.toDouble() ?? 0,
-      discount: (json['discount'] as num?)?.toDouble() ?? 0,
-      net: (json['net'] as num?)?.toDouble() ?? 0,
+      count: _asNum(json['count'])?.toInt() ?? 0,
+      gross: _asNum(json['gross'])?.toDouble() ?? 0,
+      discount: _asNum(json['discount'])?.toDouble() ?? 0,
+      net: _asNum(json['net'])?.toDouble() ?? 0,
       averageDiscountRate:
-          (json['averageDiscountRate'] as num?)?.toDouble() ?? 0,
-      suppliers: (json['suppliers'] as num?)?.toInt() ?? 0);
+          _asNum(json['averageDiscountRate'])?.toDouble() ?? 0,
+      suppliers: _asNum(json['suppliers'])?.toInt() ?? 0);
   final int count, suppliers;
   final double gross, discount, net, averageDiscountRate;
 }
@@ -1997,16 +2008,16 @@ class ContainerLoading {
 
   factory ContainerLoading.fromJson(Map<String, dynamic> json) =>
       ContainerLoading(
-        id: (json['id'] as num?)?.toInt() ?? 0,
+        id: _asNum(json['id'])?.toInt() ?? 0,
         containerNo: json['containerNo'] as String? ?? '',
         productName: json['productName'] as String? ?? '',
         containerTempBefore:
-            (json['containerTempBefore'] as num?)?.toDouble() ?? 0,
-        productTemp: (json['productTemp'] as num?)?.toDouble() ?? 0,
+            _asNum(json['containerTempBefore'])?.toDouble() ?? 0,
+        productTemp: _asNum(json['productTemp'])?.toDouble() ?? 0,
         containerTempAfter:
-            (json['containerTempAfter'] as num?)?.toDouble() ?? 0,
-        cartons: (json['cartons'] as num?)?.toDouble() ?? 0,
-        quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+            _asNum(json['containerTempAfter'])?.toDouble() ?? 0,
+        cartons: _asNum(json['cartons'])?.toDouble() ?? 0,
+        quantity: _asNum(json['quantity'])?.toDouble() ?? 0,
         loadedAt: json['loadedAt'] as String? ?? '',
         notes: json['notes'] as String? ?? '',
       );
@@ -2058,8 +2069,8 @@ class AttendanceRecord {
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) {
     final employee = (json['employee'] as Map<String, dynamic>? ?? const {});
     return AttendanceRecord(
-      id: (json['id'] as num?)?.toInt() ?? 0,
-      employeeId: (json['employeeId'] as num?)?.toInt() ?? 0,
+      id: _asNum(json['id'])?.toInt() ?? 0,
+      employeeId: _asNum(json['employeeId'])?.toInt() ?? 0,
       employeeNo: employee['employeeNo'] as String? ?? '',
       employeeName: employee['name'] as String? ?? '',
       department: employee['department'] as String? ?? '',
@@ -2122,7 +2133,7 @@ class AttendanceEmployee {
 
   factory AttendanceEmployee.fromJson(Map<String, dynamic> json) =>
       AttendanceEmployee(
-        id: (json['id'] as num).toInt(),
+        id: (_asNum(json['id']) ?? 0).toInt(),
         employeeNo: json['employeeNo'] as String? ?? '',
         name: json['name'] as String? ?? '',
         department: json['department'] as String? ?? '',
@@ -2396,7 +2407,7 @@ class ShiftRecord {
   });
 
   factory ShiftRecord.fromJson(Map<String, dynamic> json) => ShiftRecord(
-        id: (json['id'] as num?)?.toInt() ?? 1,
+        id: _asNum(json['id'])?.toInt() ?? 1,
         number: json['shift_no'] as String? ?? '',
         date: json['shift_date'] as String? ?? '',
         start: json['starts_at'] as String? ?? '',
@@ -2731,7 +2742,7 @@ class _ShiftWorkspaceState extends State<ShiftWorkspace> {
                     line: row['line_code'] as String? ?? '',
                     machine: row['machine_name'] as String? ?? '',
                     reason: row['reason_type'] as String? ?? '',
-                    minutes: (row['minutes'] as num?)?.toInt() ?? 0,
+                    minutes: _asNum(row['minutes'])?.toInt() ?? 0,
                     status: row['status'] as String? ?? 'OPEN')));
             });
         } catch (_) {}
@@ -2766,7 +2777,7 @@ class _ShiftWorkspaceState extends State<ShiftWorkspace> {
                             ? 'مرتجع'
                             : 'صرف للإنتاج',
                     material: row['material_name'] as String? ?? '',
-                    quantity: (row['quantity'] as num?)?.toInt() ?? 0)));
+                    quantity: _asNum(row['quantity'])?.toInt() ?? 0)));
             });
         } catch (_) {}
       }
@@ -2783,7 +2794,7 @@ class _ShiftWorkspaceState extends State<ShiftWorkspace> {
               supplyTotal = rows.fold<int>(
                   0,
                   (sum, row) =>
-                      sum + ((row['quantity'] as num?)?.toInt() ?? 0));
+                      sum + (_asNum(row['quantity'])?.toInt() ?? 0));
               approvedSupplies =
                   rows.where((row) => row['status'] == 'APPROVED').length;
             });
@@ -3990,7 +4001,7 @@ class _ProblemsViewState extends State<_ProblemsView> {
       if (reason.isEmpty) return;
     }
     try {
-      await ApiClient.updateProblem(token, (row['id'] as num).toInt(),
+      await ApiClient.updateProblem(token, (_asNum(row['id']) ?? 0).toInt(),
           {'status': status, if (reason.isNotEmpty) 'exceptionReason': reason},
           shiftId: shiftId);
       await refresh();
@@ -4265,7 +4276,7 @@ class _NotificationsViewState extends State<_NotificationsView> {
   }
 
   Future<void> convertToProblem(Map<String, dynamic> row) async {
-    final id = (row['id'] as num?)?.toInt();
+    final id = _asNum(row['id'])?.toInt();
     if (id == null) return;
     try {
       await ApiClient.convertNotificationToProblem(
@@ -8098,11 +8109,11 @@ class _ReportsViewState extends State<_ReportsView> {
     final production = current?['production'] as Map<String, dynamic>?;
     final attendance = current?['attendance'] as Map<String, dynamic>?;
     final quality = current?['quality'] as Map<String, dynamic>?;
-    final achievement = (current?['achievement'] as num?)?.toDouble() ??
+    final achievement = _asNum(current?['achievement'])?.toDouble() ??
         widget.state.achievement;
     final attendanceRate =
-        (current?['attendance_rate'] as num?)?.toDouble() ?? 0;
-    final rejectionRate = (current?['rejection_rate'] as num?)?.toDouble() ??
+        _asNum(current?['attendance_rate'])?.toDouble() ?? 0;
+    final rejectionRate = _asNum(current?['rejection_rate'])?.toDouble() ??
         widget.state.rejection;
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
@@ -8338,7 +8349,7 @@ class _UsersViewState extends State<_UsersView> {
                   user: user,
                   onChanged: (active) async {
                     await ApiClient.updateUserStatus(
-                        token, (user['id'] as num).toInt(), active);
+                        token, (_asNum(user['id']) ?? 0).toInt(), active);
                     await refresh();
                   }),
           ]),

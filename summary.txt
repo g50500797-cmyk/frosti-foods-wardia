@@ -1,0 +1,24 @@
+ملخص سريع
+
+- تم ربط Flutter Web بـ Railway API:
+  https://wardia-api-production.up.railway.app
+
+- تم بناء نسخة Web جديدة بنجاح.
+
+- تم رفع التحديث إلى GitHub.
+
+- تم نشر أحدث نسخة على Railway بنجاح.
+
+- رابط التطبيق الرئيسي:
+  https://wardia-api-production.up.railway.app/
+
+- حالة الفحص:
+  /api/health = 200
+
+- الملفات الأساسية:
+  - lib/main.dart
+  - backend/public/main.dart.js
+  - backend/public/flutter_bootstrap.js
+  - backend/public/flutter_service_worker.js
+  - backend/public/.last_build_id
+
