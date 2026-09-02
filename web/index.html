@@ -44,9 +44,12 @@
     // the current server-served build finally takes over.
     (function () {
       if (!('serviceWorker' in navigator)) return;
-      if (sessionStorage.getItem('sw_cleanup_done_v1')) return;
+      if (sessionStorage.getItem('sw_cleanup_reloaded_v2')) return;
       navigator.serviceWorker.getRegistrations().then(function (registrations) {
-        var hadOne = registrations.length > 0;
+        var hasStale = registrations.some(function (r) {
+          return r.waiting || (r.active && /flutter_service_worker/.test(r.active.scriptURL || ''));
+        });
+        if (!hasStale) return;
         Promise.all(registrations.map(function (r) { return r.unregister(); }))
           .then(function () {
             if (!('caches' in window)) return;
@@ -55,8 +58,8 @@
             });
           })
           .then(function () {
-            sessionStorage.setItem('sw_cleanup_done_v1', '1');
-            if (hadOne) location.reload();
+            sessionStorage.setItem('sw_cleanup_reloaded_v2', '1');
+            location.reload();
           });
       });
     })();
