@@ -1430,38 +1430,50 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: AppColors.ink,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Row(
-                        children: [
-                          _BrandMark(),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'وردية',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'دخول مشرف الوردية',
-                                  style: TextStyle(
-                                      color: Color(0xFFC8D3CF), fontSize: 14),
-                                ),
-                              ],
-                            ),
+                    _FadeSlideIn(
+                      child: Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [AppColors.brandDarkStart, AppColors.brandDarkEnd],
                           ),
-                        ],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          children: [
+                            _BrandMark(),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'وردية',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'دخول مشرف الوردية — Frosty Foods',
+                                    style: TextStyle(
+                                        color: Color(0xFFC8D3CF), fontSize: 14),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'من المزارع المصرية لموائد العالم',
+                                    style: TextStyle(
+                                        color: Color(0xFF9FD8D8), fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -1680,6 +1692,9 @@ class AppColors {
   static const redSoft = Color(0xFFFCE5E2);
   static const violet = Color(0xFF6D5BD0);
   static const violetSoft = Color(0xFFEAE7FF);
+  static const brandDarkStart = Color(0xFF0E2A30);
+  static const brandDarkEnd = Color(0xFF123840);
+  static const brandLight = Color(0xFFDEF3F3);
 }
 
 class _PhotoBackdrop extends StatefulWidget {
@@ -3010,8 +3025,8 @@ class _ShiftWorkspaceState extends State<ShiftWorkspace> {
           builder: (context) => _ChatAssistantSheet(state: this),
         ),
         backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.support_agent, color: Colors.white),
-        label: const Text('وردي',
+        icon: const Icon(Icons.engineering, color: Colors.white),
+        label: const Text('المهندس سعودي',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
       ),
     );
@@ -5082,7 +5097,7 @@ String _assistantReply(String rawInput, _ShiftWorkspaceState state) {
     return 'اكتب سؤالك وأنا هساعدك 🙂';
   }
   if (has(['سلام', 'اهلا', 'أهلا', 'هاي', 'hi', 'hello'])) {
-    return 'أهلاً بيك! أنا وردي، مساعدك في التطبيق. تقدر تسألني عن الحضور، الإنتاج، الجودة، المخزون، التوقفات، أو التقارير.';
+    return 'أهلاً بيك! أنا المهندس سعودي، مساعدك في تطبيق وردية. تقدر تسألني عن الحضور، الإنتاج، الجودة، المخزون، التوقفات، التقارير، أو حتى عن شركة فروستي فودز نفسها.';
   }
   if (has(['شكرا', 'شكراً', 'متشكر', 'تسلم', 'thanks'])) {
     return 'العفو! دايمًا تحت أمرك 🙏';
@@ -5090,8 +5105,14 @@ String _assistantReply(String rawInput, _ShiftWorkspaceState state) {
   if (has(['عامل ايه', 'عامل إيه', 'ازيك', 'إزيك', 'اخبارك', 'أخبارك'])) {
     return 'تمام الحمد لله، جاهز أساعدك. عايز تعرف إيه بالظبط؟';
   }
-  if (has(['مين انت', 'مين إنت', 'انت مين', 'إنت مين', 'اسمك ايه', 'اسمك إيه'])) {
-    return 'أنا "وردي"، مساعدك الصغير جوه تطبيق وردية. بجاوبك على أسئلتك عن الوردية الحالية، وأساعدك تلاقي أي قسم بسرعة.';
+  if (has(['تعبان', 'زهقان', 'مرهق', 'مضغوط', 'فشلان'])) {
+    return 'خد نفسك وريّح شوية، الشغل مش هيجري 🙏 لو محتاج تلخيص سريع لأي قسم قولّي وأنا أجهزهولك في ثانية.';
+  }
+  if (has(['مين انت', 'مين إنت', 'انت مين', 'إنت مين', 'اسمك ايه', 'اسمك إيه', 'مين المهندس سعودي'])) {
+    return 'أنا "المهندس سعودي"، مساعدك داخل تطبيق وردية بتاع فروستي فودز. بجاوبك على أسئلتك عن الوردية الحالية وعن الشركة ومنتجاتها، وأساعدك تلاقي أي قسم بسرعة.';
+  }
+  if (has(['مساعدة', 'ساعدني', 'اوامر', 'أوامر', 'ايه اللي تقدر', 'إيه اللي تقدر', 'بتعمل ايه', 'بتعمل إيه'])) {
+    return 'أقدر أساعدك في: الحضور والغياب، الإنتاج، الجودة والثلاجات، المخزون، التوقفات والصيانة، التقارير، بيانات شركة فروستي فودز (المنتجات، الشهادات، المصانع، التصدير)، وأي سؤال عن استخدام التطبيق نفسه.';
   }
   if (has(['حضور', 'غياب'])) {
     return 'الحضور دلوقتي ${state.present}/${state.present + state.absent}، وعدد الغايبين ${state.absent}. '
@@ -5120,7 +5141,28 @@ String _assistantReply(String rawInput, _ShiftWorkspaceState state) {
   if (has(['تنبيه', 'اشعار', 'إشعار'])) {
     return 'التنبيهات المهمة (زي غياب مرتفع أو توقف طويل أو حرارة ثلاجة غير طبيعية) بتظهر تلقائي في قسم "التنبيهات".';
   }
-  return 'مش متأكد إني فهمتك صح 🤔 جرب تسألني بشكل تاني، أو اسأل عن: الحضور، الإنتاج، الجودة، المخزون، التوقفات، أو التقارير.';
+  if (has(['دليل', 'تشغيل المنتج', 'مواصفات المنتج'])) {
+    return 'دليل تشغيل المنتجات فيه مواصفات كل صنف (الخامة، وزن العبوة، الحرارة، خطوات التشغيل) — تلاقيه في قسم "دليل تشغيل المنتجات" في القائمة.';
+  }
+  if (has(['فروستي', 'frosty', 'الشركة', 'الشركه'])) {
+    return 'فروستي فودز شركة مصرية لتصنيع وتصدير الأغذية المجمدة بتقنية IQF (التجميد الفردي السريع)، من المزارع المصرية لموائد العالم. المقر الرئيسي في الإسكندرية، وليها مصنعين: واحد في المنطقة الصناعية الرابعة ببرج العرب، والتاني على طريق مصر إسكندرية الصحراوي.';
+  }
+  if (has(['منتجات', 'بتنتج ايه', 'بتنتج إيه', 'اصناف', 'أصناف'])) {
+    return 'أهم منتجات فروستي فودز: فراولة ورمان مجمد، وخضروات مجمدة زي الخرشوف والبروكلي والملوخية والبازلاء والسبانخ والبامية والقلقاس والفاصوليا والفول الأخضر والقرنبيط، بالإضافة لخلطات الخضار المشكلة حسب طلب العميل. كل التفاصيل في قسم "دليل تشغيل المنتجات".';
+  }
+  if (has(['شهاد', 'ايزو', 'أيزو', 'iso', 'haccp', 'brc', 'fda', 'كوشر', 'kosher'])) {
+    return 'الشركة حاصلة على شهادات BRC للسلامة الغذائية، ISO 9001:2015 لإدارة الجودة، ISO 22000 وFSSC 22000 لسلامة الغذاء، ومعتمدة لدى FDA الأمريكية، وحاصلة على شهادة كوشر KLBD.';
+  }
+  if (has(['مصنع', 'مصانع', 'فرع', 'فروع', 'عنوان', 'فين المصنع', 'موقع الشركة'])) {
+    return 'المقر الرئيسي: 66 شارع الحرية، العطارين، الإسكندرية. مصنع 1: القطعة 15-16 بالمنطقة الصناعية الرابعة، برج العرب الجديدة. مصنع 2: الكيلو 59 طريق مصر إسكندرية الصحراوي.';
+  }
+  if (has(['تصدير', 'دول', 'اسواق', 'أسواق', 'export'])) {
+    return 'فروستي فودز بتصدّر لأوروبا والشرق الأوسط وأفريقيا وآسيا، وليها حضور دولي في معارض زي SIAL باريس وSIAL مونتريال ومعرض الصين للاستيراد والتصدير وGulfood دبي.';
+  }
+  if (has(['تواصل', 'رقم الشركة', 'تليفون الشركة', 'ايميل الشركة', 'إيميل الشركة', 'اتصل'])) {
+    return 'تليفون الشركة: 4854400 3 20+. إيميل التصدير: export@frosty-foods.com، وإيميل التسويق والتوظيف: marketing@frosty-foods.com.';
+  }
+  return 'مش متأكد إني فهمتك صح 🤔 جرب تسألني بشكل تاني، أو اسأل عن: الحضور، الإنتاج، الجودة، المخزون، التوقفات، التقارير، أو حتى عن منتجات وشهادات فروستي فودز.';
 }
 
 class _ChatAssistantSheet extends StatefulWidget {
@@ -5137,7 +5179,7 @@ class _ChatAssistantSheetState extends State<_ChatAssistantSheet> {
   final List<_ChatMessage> _messages = [
     const _ChatMessage(
         text:
-            'أهلاً! أنا وردي، مساعدك في التطبيق. اسألني عن أي قسم أو أي حاجة عايز تعرفها عن الوردية الحالية.',
+            'أهلاً! أنا المهندس سعودي، مساعدك في تطبيق وردية. اسألني عن أي قسم، أو عن شركة فروستي فودز ومنتجاتها وشهاداتها.',
         fromUser: false),
   ];
 
@@ -5208,7 +5250,7 @@ class _ChatAssistantSheetState extends State<_ChatAssistantSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('وردي - مساعدك الذكي',
+                      Text('المهندس سعودي - مساعدك الذكي',
                           style: TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 15,
@@ -6957,6 +6999,144 @@ class _DialogInput extends StatelessWidget {
                   Icon(numeric ? Icons.numbers : Icons.edit_outlined))));
 }
 
+class _FrostyBrandHeader extends StatelessWidget {
+  const _FrostyBrandHeader();
+
+  static const List<List<String>> _certs = [
+    ['BRC', 'https://visionary-kheer-401095.netlify.app/assets/0e2d639f4745d45d7c6dc00dfeb0ad014d4829f63725dd355f2718c6b0c27a95.png'],
+    ['ISO 9001:2015', 'https://visionary-kheer-401095.netlify.app/assets/3282ec79ac46bbe60dfd9b8ea098f9f70fe9ad111613283c749b7f36c1230914.png'],
+    ['ISO 22000', 'https://visionary-kheer-401095.netlify.app/assets/ca5fc9d495b6af80f2f3c3bc422c30680f7ebc4e1997b84a32e93b33347d2ded.png'],
+    ['FSSC 22000', 'https://visionary-kheer-401095.netlify.app/assets/8582996a92fd1aad424b1593b97a9fc58ee786545ba437fc5000c11dafdc51f9.png'],
+    ['FDA', 'https://visionary-kheer-401095.netlify.app/assets/046e6515654102e8d2f14347817aa7350a32f66d936ec573f0df59cade00ab8a.png'],
+    ['Kosher KLBD', 'https://visionary-kheer-401095.netlify.app/assets/00a3b4292f55d6303241ef5d0247a8aa148d064c8d8c86b9aa786a3b4d88722d.png'],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.brandDarkStart, AppColors.brandDarkEnd],
+        ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              width: 56,
+              height: 56,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  'https://visionary-kheer-401095.netlify.app/assets/2ac46d6e354518e84562caf34a068f8864e14accaea3eb1d6917fc27de2e4f0b.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.icecream_outlined, color: AppColors.primary),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Frosty Foods | فروستي فودز',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900)),
+                  SizedBox(height: 3),
+                  Text(
+                      'من المزارع المصرية لموائد العالم — مُصنِّع ومُصدِّر مصري للأغذية المجمدة بتقنية IQF',
+                      style: TextStyle(
+                          color: Color(0xFFBFE6E6), fontSize: 12, height: 1.4)),
+                ],
+              ),
+            ),
+          ]),
+          const SizedBox(height: 16),
+          const Text('الشهادات المعتمدة',
+              style: TextStyle(
+                  color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 44,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _certs.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.network(_certs[i][1],
+                        width: 24,
+                        height: 24,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(
+                            Icons.verified_outlined,
+                            color: Colors.white,
+                            size: 18)),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(_certs[i][0],
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(spacing: 18, runSpacing: 8, children: const [
+            _BrandFact(
+                icon: Icons.location_on_outlined,
+                text: 'المقر: 66 شارع الحرية، العطارين، الإسكندرية'),
+            _BrandFact(
+                icon: Icons.factory_outlined,
+                text: 'مصنعين: برج العرب الجديدة، وطريق مصر إسكندرية الصحراوي'),
+            _BrandFact(
+                icon: Icons.public_outlined,
+                text: 'التصدير: أوروبا، الشرق الأوسط، أفريقيا، آسيا'),
+            _BrandFact(icon: Icons.email_outlined, text: 'export@frosty-foods.com'),
+            _BrandFact(icon: Icons.call_outlined, text: '4854400 3 20+'),
+          ]),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrandFact extends StatelessWidget {
+  const _BrandFact({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, color: const Color(0xFFBFE6E6), size: 14),
+        const SizedBox(width: 4),
+        Text(text, style: const TextStyle(color: Colors.white, fontSize: 11)),
+      ]);
+}
+
 class _ProductGuideView extends StatefulWidget {
   const _ProductGuideView({required this.state});
   final _ShiftWorkspaceState state;
@@ -7034,6 +7214,7 @@ class _ProductGuideViewState extends State<_ProductGuideView> {
   @override
   Widget build(BuildContext context) =>
       ListView(padding: const EdgeInsets.fromLTRB(18, 18, 18, 28), children: [
+        const _FadeSlideIn(child: _FrostyBrandHeader()),
         Row(children: [
           const Icon(Icons.menu_book_outlined,
               color: AppColors.primary, size: 30),
@@ -7099,11 +7280,26 @@ class _ProductGuideCard extends StatelessWidget {
   Widget build(BuildContext context) => Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ExpansionTile(
-          leading: Icon(
-              guide.department == 'IQF'
-                  ? Icons.ac_unit_outlined
-                  : Icons.inventory_2_outlined,
-              color: AppColors.primary),
+          leading: (guide.imageUrl != null && guide.imageUrl!.isNotEmpty)
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    guide.imageUrl!,
+                    width: 44,
+                    height: 44,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(
+                        guide.department == 'IQF'
+                            ? Icons.ac_unit_outlined
+                            : Icons.inventory_2_outlined,
+                        color: AppColors.primary),
+                  ),
+                )
+              : Icon(
+                  guide.department == 'IQF'
+                      ? Icons.ac_unit_outlined
+                      : Icons.inventory_2_outlined,
+                  color: AppColors.primary),
           title: Text(guide.name,
               style: const TextStyle(fontWeight: FontWeight.w900)),
           subtitle: Text(
