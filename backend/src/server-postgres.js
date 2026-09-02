@@ -535,10 +535,10 @@ if (publicDirExists) {
   app.use(express.static(publicDir, {
     etag: false,
     lastModified: false,
-    setHeaders: (res) => res.set('Cache-Control', 'no-cache'),
+    setHeaders: (res) => res.set('Cache-Control', 'no-store, no-cache, must-revalidate'),
   }));
   app.get(/^(?!\/api).*/, (req, res, next) => {
-    res.set('Cache-Control', 'no-cache');
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.sendFile(path.join(publicDir, 'index.html'), { etag: false, lastModified: false }, (err) => { if (err) next(err); });
   });
 } else {
