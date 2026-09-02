@@ -105,13 +105,28 @@ class _AuthGateState extends State<AuthGate> {
     if (session.accessToken != null && session.accessToken!.isNotEmpty) {
       await SessionStorage.writeToken(session.accessToken!);
     }
+    if (session.email.isNotEmpty) {
+      await SessionStorage.writeEmail(session.email);
+    }
     if (mounted) setState(() => _session = session);
   }
 
   @override
   Widget build(BuildContext context) {
     if (_restoring) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('جاري التحقق من الجلسة...',
+                  style: TextStyle(color: AppColors.muted, fontSize: 13)),
+            ],
+          ),
+        ),
+      );
     }
     if (_session == null) {
       return LoginPage(
@@ -309,8 +324,11 @@ class ApiClient {
           body: jsonEncode({'email': email, 'password': password}),
         )
         .timeout(const Duration(seconds: 25));
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception('INVALID_CREDENTIALS');
+    }
     if (response.statusCode != 200) {
-      throw Exception('بيانات الدخول غير صحيحة أو الخادم غير متاح');
+      throw Exception('LOGIN_SERVER_ERROR:${response.statusCode}');
     }
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     final user = payload['user'] as Map<String, dynamic>;
@@ -1375,15 +1393,27 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'manager@wardia.app');
-  final _passwordController = TextEditingController(text: '123456');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _passwordFocus = FocusNode();
   bool _obscurePassword = true;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SessionStorage.readEmail().then((value) {
+      if (mounted && value != null && value.isNotEmpty) {
+        setState(() => _emailController.text = value);
+      }
+    });
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -1465,6 +1495,9 @@ class _LoginPageState extends State<LoginPage> {
                             TextFormField(
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              onFieldSubmitted: (_) => FocusScope.of(context)
+                                  .requestFocus(_passwordFocus),
                               decoration: _inputDecoration(
                                 label: 'الإيميل',
                                 icon: Icons.email_outlined,
@@ -1482,7 +1515,10 @@ class _LoginPageState extends State<LoginPage> {
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _passwordController,
+                              focusNode: _passwordFocus,
                               obscureText: _obscurePassword,
+                              textInputAction: TextInputAction.done,
+                              onFieldSubmitted: (_) => _login(),
                               decoration: _inputDecoration(
                                 label: 'كلمة المرور',
                                 icon: Icons.lock_outline,
@@ -1539,12 +1575,6 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'بيانات تجربة جاهزة: manager@wardia.app / 123456',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.muted, fontSize: 12),
-                    ),
                   ],
                 ),
               ),
@@ -1594,15 +1624,17 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       widget.onLogin(session);
-    } catch (_) {
+    } catch (e, st) {
+      print('[login] failed: $e\n$st');
       if (!mounted) return;
       setState(() => _isLoading = false);
+      final message = e.toString().contains('INVALID_CREDENTIALS')
+          ? 'الإيميل أو كلمة المرور غير صحيحة'
+          : 'تعذر الاتصال بالخادم، تأكد من اتصال الإنترنت وحاول تاني';
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-              content:
-                  Text('تعذر تسجيل الدخول. تأكد من تشغيل الخادم والبيانات.')),
+          SnackBar(content: Text(message)),
         );
     }
   }
@@ -2969,6 +3001,18 @@ class _ShiftWorkspaceState extends State<ShiftWorkspace> {
             ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => _ChatAssistantSheet(state: this),
+        ),
+        backgroundColor: AppColors.primary,
+        icon: const Icon(Icons.support_agent, color: Colors.white),
+        label: const Text('وردي',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
       ),
     );
   }
@@ -5019,6 +5063,243 @@ class _PulsingDotState extends State<_PulsingDot>
         );
       },
       child: dot,
+    );
+  }
+}
+
+class _ChatMessage {
+  const _ChatMessage({required this.text, required this.fromUser});
+  final String text;
+  final bool fromUser;
+}
+
+String _assistantReply(String rawInput, _ShiftWorkspaceState state) {
+  final input = rawInput.trim();
+  final t = input.toLowerCase();
+  bool has(List<String> words) => words.any((w) => t.contains(w));
+
+  if (input.isEmpty) {
+    return 'اكتب سؤالك وأنا هساعدك 🙂';
+  }
+  if (has(['سلام', 'اهلا', 'أهلا', 'هاي', 'hi', 'hello'])) {
+    return 'أهلاً بيك! أنا وردي، مساعدك في التطبيق. تقدر تسألني عن الحضور، الإنتاج، الجودة، المخزون، التوقفات، أو التقارير.';
+  }
+  if (has(['شكرا', 'شكراً', 'متشكر', 'تسلم', 'thanks'])) {
+    return 'العفو! دايمًا تحت أمرك 🙏';
+  }
+  if (has(['عامل ايه', 'عامل إيه', 'ازيك', 'إزيك', 'اخبارك', 'أخبارك'])) {
+    return 'تمام الحمد لله، جاهز أساعدك. عايز تعرف إيه بالظبط؟';
+  }
+  if (has(['مين انت', 'مين إنت', 'انت مين', 'إنت مين', 'اسمك ايه', 'اسمك إيه'])) {
+    return 'أنا "وردي"، مساعدك الصغير جوه تطبيق وردية. بجاوبك على أسئلتك عن الوردية الحالية، وأساعدك تلاقي أي قسم بسرعة.';
+  }
+  if (has(['حضور', 'غياب'])) {
+    return 'الحضور دلوقتي ${state.present}/${state.present + state.absent}، وعدد الغايبين ${state.absent}. '
+        'عشان تسجل حضور أو غياب: روح لقسم "الوردية" من القائمة، هتلاقي زرار "إضافة" فوق يمين الشاشة.';
+  }
+  if (has(['انتاج', 'إنتاج', 'المستهدف', 'الهدف'])) {
+    return 'الإنتاج الحالي ${state.actual} بنسبة تحقيق ${state.achievement.toStringAsFixed(1)}% من المستهدف. '
+        'تقدر تسجل إنتاج ساعة جديدة من قسم "الإنتاج".';
+  }
+  if (has(['جوده', 'جودة', 'ثلاج', 'حراره', 'حرارة', 'defrost'])) {
+    return 'نسبة الالتزام بقراءات الثلاجات دلوقتي ${state.fridgeTotals.compliance.toStringAsFixed(1)}%. '
+        'تقدر تسجل قراءة جديدة من قسم "الجودة".';
+  }
+  if (has(['مخزون', 'رصيد', 'توريد', 'صرف'])) {
+    return 'الرصيد الحالي في المخزون ${state.inventoryBalance}. تقدر تسجل توريد أو صرف من قسم "المخزون".';
+  }
+  if (has(['توقف', 'صيان', 'عطل'])) {
+    return 'إجمالي دقائق التوقف المسجلة دلوقتي ${state.downtime} دقيقة. تقدر تسجل توقف أو بلاغ صيانة من قسم "التوقفات والصيانة".';
+  }
+  if (has(['تقرير'])) {
+    return 'تقدر تطلع تقرير الوردية من قسم "التقارير" — فيه نسخة HTML ونسخة CSV جاهزين للتحميل.';
+  }
+  if (has(['خروج', 'اطلع', 'أطلع', 'log out', 'logout'])) {
+    return 'زرار تسجيل الخروج تلاقيه فوق يمين الشاشة، أيقونة الباب.';
+  }
+  if (has(['تنبيه', 'اشعار', 'إشعار'])) {
+    return 'التنبيهات المهمة (زي غياب مرتفع أو توقف طويل أو حرارة ثلاجة غير طبيعية) بتظهر تلقائي في قسم "التنبيهات".';
+  }
+  return 'مش متأكد إني فهمتك صح 🤔 جرب تسألني بشكل تاني، أو اسأل عن: الحضور، الإنتاج، الجودة، المخزون، التوقفات، أو التقارير.';
+}
+
+class _ChatAssistantSheet extends StatefulWidget {
+  const _ChatAssistantSheet({required this.state});
+  final _ShiftWorkspaceState state;
+
+  @override
+  State<_ChatAssistantSheet> createState() => _ChatAssistantSheetState();
+}
+
+class _ChatAssistantSheetState extends State<_ChatAssistantSheet> {
+  final _controller = TextEditingController();
+  final _scrollController = ScrollController();
+  final List<_ChatMessage> _messages = [
+    const _ChatMessage(
+        text:
+            'أهلاً! أنا وردي، مساعدك في التطبيق. اسألني عن أي قسم أو أي حاجة عايز تعرفها عن الوردية الحالية.',
+        fromUser: false),
+  ];
+
+  void _send() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    setState(() {
+      _messages.add(_ChatMessage(text: text, fromUser: true));
+      _messages
+          .add(_ChatMessage(text: _assistantReply(text, widget.state), fromUser: false));
+    });
+    _controller.clear();
+    Future.delayed(const Duration(milliseconds: 80), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.65,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (context, scrollSheetController) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Icon(Icons.support_agent, color: AppColors.primary),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('وردي - مساعدك الذكي',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              color: AppColors.ink)),
+                      Text('هنا عشان أساعدك في أي وقت',
+                          style: TextStyle(fontSize: 11, color: AppColors.muted)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ]),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView.builder(
+                controller: scrollSheetController,
+                padding: const EdgeInsets.all(14),
+                itemCount: _messages.length,
+                itemBuilder: (context, index) {
+                  final m = _messages[index];
+                  return Align(
+                    alignment:
+                        m.fromUser ? Alignment.centerLeft : Alignment.centerRight,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 5),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      constraints: BoxConstraints(
+                          maxWidth: MediaQuery.sizeOf(context).width * 0.75),
+                      decoration: BoxDecoration(
+                        color: m.fromUser ? AppColors.primary : AppColors.background,
+                        borderRadius: BorderRadius.circular(14),
+                        border: m.fromUser ? null : Border.all(color: AppColors.border),
+                      ),
+                      child: Text(
+                        m.text,
+                        style: TextStyle(
+                          color: m.fromUser ? Colors.white : AppColors.ink,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    decoration: InputDecoration(
+                      hintText: 'اكتب سؤالك هنا...',
+                      filled: true,
+                      fillColor: AppColors.background,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: _send,
+                  borderRadius: BorderRadius.circular(22),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.send, color: Colors.white, size: 19),
+                  ),
+                ),
+              ]),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
